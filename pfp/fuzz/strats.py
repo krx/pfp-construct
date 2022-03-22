@@ -15,7 +15,7 @@ import six
 
 
 # local imports
-import pfp.fields
+# import pfp.fields
 import pfp.errors
 
 

@@ -2,11 +2,12 @@
 # encoding: utf-8
 
 from pfp.native import native
-import pfp.fields
+# import pfp.fields
 from pfp.dbg import PfpDbg
+import construct as C
 
 
-@native(name="Int3", ret=pfp.fields.Void, send_interp=True)
+@native(name="Int3", ret=C.Pass, send_interp=True)
 def int3(params, ctxt, scope, stream, coord, interp):
     """Define the ``Int3()`` function in the interpreter. Calling
     ``Int3()`` will drop the user into an interactive debugger.

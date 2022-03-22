@@ -11,7 +11,7 @@ from pfp.bitwrap import BitwrappedStream
 import pfp.fuzz
 
 
-pfp.fuzz.init()
+# pfp.fuzz.init()
 
 
 __version__ = "{{VERSION}}"

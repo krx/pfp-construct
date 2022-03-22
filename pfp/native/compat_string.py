@@ -12,7 +12,8 @@ import sys
 
 from pfp.native import native
 import pfp.errors as errors
-import pfp.fields
+# import pfp.fields
+import construct as C
 
 
 def _cmp(a, b):
@@ -25,7 +26,7 @@ def _cmp(a, b):
 # http://www.sweetscape.com/010editor/manual/FuncString.htm
 
 # double Atof( const char s[] )
-@native(name="Atof", ret=pfp.fields.Double)
+@native(name="Atof", ret=C.Double)
 def Atof(params, ctxt, scope, stream, coord):
     if len(params) < 1:
         raise errors.InvalidArguments(
@@ -35,7 +36,7 @@ def Atof(params, ctxt, scope, stream, coord):
 
 
 # int Atoi( const char s[] )
-@native(name="Atoi", ret=pfp.fields.Int)
+@native(name="Atoi", ret=C.Int)
 def Atoi(params, ctxt, scope, stream, coord):
     if len(params) < 1:
         raise errors.InvalidArguments(
@@ -45,97 +46,97 @@ def Atoi(params, ctxt, scope, stream, coord):
 
 
 # int64 BinaryStrToInt( const char s[] )
-@native(name="BinaryStrToInt", ret=pfp.fields.Int64)
+@native(name="BinaryStrToInt", ret=C.Long)
 def BinaryStrToInt(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # char[] ConvertString( const char src[], int srcCharSet, int destCharSet )
-@native(name="ConvertString", ret=pfp.fields.String)
+@native(name="ConvertString", ret=C.CString)
 def ConvertString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # string DosDateToString( DOSDATE d, char format[] = "MM/dd/yyyy" )
-@native(name="DosDateToString", ret=pfp.fields.String)
+@native(name="DosDateToString", ret=C.CString)
 def DosDateToString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # string DosTimeToString( DOSTIME t, char format[] = "hh:mm:ss" )
-@native(name="DosTimeToString", ret=pfp.fields.String)
+@native(name="DosTimeToString", ret=C.CString)
 def DosTimeToString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # string EnumToString( enum e )
-@native(name="EnumToString", ret=pfp.fields.String)
+@native(name="EnumToString", ret=C.CString)
 def EnumToString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # char[] FileNameGetBase( const char path[], int includeExtension=true )
-@native(name="FileNameGetBase", ret=pfp.fields.String)
+@native(name="FileNameGetBase", ret=C.CString)
 def FileNameGetBase(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # wchar_t[] FileNameGetBaseW( const wchar_t path[], int includeExtension=true )
-@native(name="FileNameGetBaseW", ret=pfp.fields.WString)
+@native(name="FileNameGetBaseW", ret=C.CString)
 def FileNameGetBaseW(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # char[] FileNameGetExtension( const char path[] )
-@native(name="FileNameGetExtension", ret=pfp.fields.String)
+@native(name="FileNameGetExtension", ret=C.CString)
 def FileNameGetExtension(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # wchar_t[] FileNameGetExtensionW( const wchar_t path[] )
-@native(name="FileNameGetExtensionW", ret=pfp.fields.WString)
+@native(name="FileNameGetExtensionW", ret=C.CString)
 def FileNameGetExtensionW(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # char[] FileNameGetPath( const char path[], int includeSlash=true )
-@native(name="FileNameGetPath", ret=pfp.fields.String)
+@native(name="FileNameGetPath", ret=C.CString)
 def FileNameGetPath(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # wchar_t[] FileNameGetPathW( const wchar_t path[], int includeSlash=true )
-@native(name="FileNameGetPathW", ret=pfp.fields.WString)
+@native(name="FileNameGetPathW", ret=C.CString)
 def FileNameGetPathW(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # char[] FileNameSetExtension( const char path[], const char extension[] )
-@native(name="FileNameSetExtension", ret=pfp.fields.String)
+@native(name="FileNameSetExtension", ret=C.CString)
 def FileNameSetExtension(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # wchar_t[] FileNameSetExtensionW( const wchar_t path[], const wchar_t extension[] )
-@native(name="FileNameSetExtensionW", ret=pfp.fields.WString)
+@native(name="FileNameSetExtensionW", ret=C.CString)
 def FileNameSetExtensionW(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # string FileTimeToString( FILETIME ft, char format[] = "MM/dd/yyyy hh:mm:ss" )
-@native(name="FileTimeToString", ret=pfp.fields.String)
+@native(name="FileTimeToString", ret=C.CString)
 def FileTimeToString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # char[] IntToBinaryStr( int64 num, int numGroups=0, int includeSpaces=true )
-@native(name="IntToBinaryStr", ret=pfp.fields.String)
+@native(name="IntToBinaryStr", ret=C.CString)
 def IntToBinaryStr(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int Memcmp( const uchar s1[], const uchar s2[], int n )
-@native(name="Memcmp", ret=pfp.fields.Int)
+@native(name="Memcmp", ret=C.Int)
 def Memcmp(params, ctxt, scope, stream, coord):
     """
     int Memcmp( const uchar s1[], const uchar s2[], int n )
@@ -159,7 +160,7 @@ def Memcmp(params, ctxt, scope, stream, coord):
 
 
 # void Memcpy( uchar dest[], const uchar src[], int n, int destOffset=0, int srcOffset=0 )
-@native(name="Memcpy", ret=pfp.fields.Void)
+@native(name="Memcpy", ret=C.Pass)
 def Memcpy(params, ctxt, scope, stream, coord):
     if len(params) < 3:
         raise errors.InvalidArguments(
@@ -205,43 +206,43 @@ def Memcpy(params, ctxt, scope, stream, coord):
 
 
 # void Memset( uchar s[], int c, int n )
-@native(name="Memset", ret=pfp.fields.Void)
+@native(name="Memset", ret=C.Pass)
 def Memset(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # string OleTimeToString( OLETIME ot, char format[] = "MM/dd/yyyy hh:mm:ss" )
-@native(name="OleTimeToString", ret=pfp.fields.String)
+@native(name="OleTimeToString", ret=C.CString)
 def OleTimeToString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int RegExMatch( string str, string regex );
-@native(name="RegExMatch", ret=pfp.fields.Int)
+@native(name="RegExMatch", ret=C.Int)
 def RegExMatch(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int RegExMatchW( wstring str, wstring regex );
-@native(name="RegExMatchW", ret=pfp.fields.Int)
+@native(name="RegExMatchW", ret=C.Int)
 def RegExMatchW(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int RegExSearch( string str, string regex, int &matchSize, int startPos=0 );
-@native(name="RegExSearch", ret=pfp.fields.Int)
+@native(name="RegExSearch", ret=C.Int)
 def RegExSearch(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int RegExSearchW( wstring str, wstring regex, int &matchSize, int startPos=0 );
-@native(name="RegExSearchW", ret=pfp.fields.Int)
+@native(name="RegExSearchW", ret=C.Int)
 def RegExSearchW(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int SPrintf( char buffer[], const char format[] [, argument, ... ] )
-@native(name="SPrintf", ret=pfp.fields.Int)
+@native(name="SPrintf", ret=C.Int)
 def SPrintf(params, ctxt, scope, stream, coord):
     if len(params) < 2:
         raise errors.InvalidArguments(
@@ -255,7 +256,7 @@ def SPrintf(params, ctxt, scope, stream, coord):
     parts = []
     for part in params[2:]:
         if isinstance(part, pfp.fields.Array) or isinstance(
-            part, pfp.fields.String
+            part, C.CString
         ):
             parts.append(PYSTR(part))
         else:
@@ -267,19 +268,19 @@ def SPrintf(params, ctxt, scope, stream, coord):
 
 
 # int SScanf( char str[], char format[], ... )
-@native(name="SScanf", ret=pfp.fields.Int)
+@native(name="SScanf", ret=C.Int)
 def SScanf(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void Strcat( char dest[], const char src[] )
-@native(name="Strcat", ret=pfp.fields.Void)
+@native(name="Strcat", ret=C.Pass)
 def Strcat(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int Strchr( const char s[], char c )
-@native(name="Strchr", ret=pfp.fields.Int)
+@native(name="Strchr", ret=C.Int)
 def Strchr(params, ctxt, scope, stream, coord):
     if len(params) != 2:
         raise errors.InvalidArguments(
@@ -298,7 +299,7 @@ def Strchr(params, ctxt, scope, stream, coord):
 
 
 # int Strcmp( const char s1[], const char s2[] )
-@native(name="Strcmp", ret=pfp.fields.Int)
+@native(name="Strcmp", ret=C.Int)
 def Strcmp(params, ctxt, scope, stream, coord):
     if len(params) != 2:
         raise errors.InvalidArguments(
@@ -311,7 +312,7 @@ def Strcmp(params, ctxt, scope, stream, coord):
 
 
 # void Strcpy( char dest[], const char src[] )
-@native(name="Strcpy", ret=pfp.fields.Void)
+@native(name="Strcpy", ret=C.Pass)
 def Strcpy(params, ctxt, scope, stream, coord):
     if len(params) != 2:
         raise errors.InvalidArguments(
@@ -322,13 +323,13 @@ def Strcpy(params, ctxt, scope, stream, coord):
 
 
 # char[] StrDel( const char str[], int start, int count )
-@native(name="StrDel", ret=pfp.fields.String)
+@native(name="StrDel", ret=C.CString)
 def StrDel(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int Stricmp( const char s1[], const char s2[] )
-@native(name="Stricmp", ret=pfp.fields.Int)
+@native(name="Stricmp", ret=C.Int)
 def Stricmp(params, ctxt, scope, stream, coord):
     if len(params) != 2:
         raise errors.InvalidArguments(
@@ -341,49 +342,49 @@ def Stricmp(params, ctxt, scope, stream, coord):
 
 
 # int StringToDosDate( string s, DOSDATE &d, char format[] = "MM/dd/yyyy" )
-@native(name="StringToDosDate", ret=pfp.fields.Int)
+@native(name="StringToDosDate", ret=C.Int)
 def StringToDosDate(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int StringToDosTime( string s, DOSTIME &t, char format[] = "hh:mm:ss" )
-@native(name="StringToDosTime", ret=pfp.fields.Int)
+@native(name="StringToDosTime", ret=C.Int)
 def StringToDosTime(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int StringToFileTime( string s, FILETIME &ft, char format[] = "MM/dd/yyyy hh:mm:ss" )
-@native(name="StringToFileTime", ret=pfp.fields.Int)
+@native(name="StringToFileTime", ret=C.Int)
 def StringToFileTime(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int StringToOleTime( string s, OLETIME &ot, char format[] = "MM/dd/yyyy hh:mm:ss" )
-@native(name="StringToOleTime", ret=pfp.fields.Int)
+@native(name="StringToOleTime", ret=C.Int)
 def StringToOleTime(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int StringToTimeT( string s, time_t &t, char format[] = "MM/dd/yyyy hh:mm:ss" )
-@native(name="StringToTimeT", ret=pfp.fields.Int)
+@native(name="StringToTimeT", ret=C.Int)
 def StringToTimeT(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # char[] StringToUTF8( const char src[], int srcCharSet=CHARSET_ANSI )
-@native(name="StringToUTF8", ret=pfp.fields.String)
+@native(name="StringToUTF8", ret=C.CString)
 def StringToUTF8(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # wstring StringToWString( const char str[], int srcCharSet=CHARSET_ANSI )
-@native(name="StringToWString", ret=pfp.fields.WString)
+@native(name="StringToWString", ret=C.CString)
 def StringToWString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int Strlen( const char s[] )
-@native(name="Strlen", ret=pfp.fields.Int)
+@native(name="Strlen", ret=C.Int)
 def Strlen(params, ctxt, scope, stream, coord):
     if len(params) != 1:
         raise errors.InvalidArguments(
@@ -398,7 +399,7 @@ def Strlen(params, ctxt, scope, stream, coord):
 
 
 # int Strncmp( const char s1[], const char s2[], int n )
-@native(name="Strncmp", ret=pfp.fields.Int)
+@native(name="Strncmp", ret=C.Int)
 def Strncmp(params, ctxt, scope, stream, coord):
     if len(params) != 3:
         raise errors.InvalidArguments(
@@ -412,7 +413,7 @@ def Strncmp(params, ctxt, scope, stream, coord):
 
 
 # void Strncpy( char dest[], const char src[], int n )
-@native(name="Strncpy", ret=pfp.fields.Void)
+@native(name="Strncpy", ret=C.Pass)
 def Strncpy(params, ctxt, scope, stream, coord):
     if len(params) != 3:
         raise errors.InvalidArguments(
@@ -424,7 +425,7 @@ def Strncpy(params, ctxt, scope, stream, coord):
 
 
 # int Strnicmp( const char s1[], const char s2[], int n )
-@native(name="Strnicmp", ret=pfp.fields.Int)
+@native(name="Strnicmp", ret=C.Int)
 def Strnicmp(params, ctxt, scope, stream, coord):
     if len(params) != 3:
         raise errors.InvalidArguments(
@@ -438,7 +439,7 @@ def Strnicmp(params, ctxt, scope, stream, coord):
 
 
 # int Strstr( const char s1[], const char s2[] )
-@native(name="Strstr", ret=pfp.fields.Int)
+@native(name="Strstr", ret=C.Int)
 def Strstr(params, ctxt, scope, stream, coord):
     if len(params) != 2:
         raise errors.InvalidArguments(
@@ -457,7 +458,7 @@ def Strstr(params, ctxt, scope, stream, coord):
 
 
 # char[] SubStr( const char str[], int start, int count=-1 )
-@native(name="SubStr", ret=pfp.fields.String)
+@native(name="SubStr", ret=C.CString)
 def SubStr(params, ctxt, scope, stream, coord):
     if len(params) < 2:
         raise errors.InvalidArguments(
@@ -479,13 +480,13 @@ def SubStr(params, ctxt, scope, stream, coord):
 
 
 # string TimeTToString( time_t t, char format[] = "MM/dd/yyyy hh:mm:ss" )
-@native(name="TimeTToString", ret=pfp.fields.String)
+@native(name="TimeTToString", ret=C.CString)
 def TimeTToString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # char ToLower( char c )
-@native(name="ToLower", ret=pfp.fields.Char)
+@native(name="ToLower", ret=C.Byte)
 def ToLower(params, ctxt, scope, stream, coord):
     if len(params) != 1:
         raise errors.InvalidArguments(
@@ -495,13 +496,13 @@ def ToLower(params, ctxt, scope, stream, coord):
 
 
 # wchar_t ToLowerW( wchar_t c )
-@native(name="ToLowerW", ret=pfp.fields.WChar)
+@native(name="ToLowerW", ret=C.Short)
 def ToLowerW(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # char ToUpper( char c )
-@native(name="ToUpper", ret=pfp.fields.Char)
+@native(name="ToUpper", ret=C.Byte)
 def ToUpper(params, ctxt, scope, stream, coord):
     if len(params) != 1:
         raise errors.InvalidArguments(
@@ -511,102 +512,102 @@ def ToUpper(params, ctxt, scope, stream, coord):
 
 
 # void WMemcmp( const wchar_t s1[], const wchar_t s2[], int n )
-@native(name="WMemcmp", ret=pfp.fields.Void)
+@native(name="WMemcmp", ret=C.Pass)
 def WMemcmp(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WMemcpy( wchar_t dest[], const wchar_t src[], int n, int destOffset=0, int srcOffset=0 )
-@native(name="WMemcpy", ret=pfp.fields.Void)
+@native(name="WMemcpy", ret=C.Pass)
 def WMemcpy(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WMemset( wchar_t s[], int c, int n )
-@native(name="WMemset", ret=pfp.fields.Void)
+@native(name="WMemset", ret=C.Pass)
 def WMemset(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WStrcat( wchar_t dest[], const wchar_t src[] )
-@native(name="WStrcat", ret=pfp.fields.Void)
+@native(name="WStrcat", ret=C.Pass)
 def WStrcat(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int WStrchr( const wchar_t s[], wchar_t c )
-@native(name="WStrchr", ret=pfp.fields.Int)
+@native(name="WStrchr", ret=C.Int)
 def WStrchr(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int WStrcmp( const wchar_t s1[], const wchar_t s2[] )
-@native(name="WStrcmp", ret=pfp.fields.Int)
+@native(name="WStrcmp", ret=C.Int)
 def WStrcmp(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WStrcpy( wchar_t dest[], const wchar_t src[] )
-@native(name="WStrcpy", ret=pfp.fields.Void)
+@native(name="WStrcpy", ret=C.Pass)
 def WStrcpy(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # wchar_t[] WStrDel( const whar_t str[], int start, int count )
-@native(name="WStrDel", ret=pfp.fields.WString)
+@native(name="WStrDel", ret=C.CString)
 def WStrDel(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int WStricmp( const wchar_t s1[], const wchar_t s2[] )
-@native(name="WStricmp", ret=pfp.fields.Int)
+@native(name="WStricmp", ret=C.Int)
 def WStricmp(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # char[] WStringToString( const wchar_t str[], int destCharSet=CHARSET_ANSI )
-@native(name="WStringToString", ret=pfp.fields.String)
+@native(name="WStringToString", ret=C.CString)
 def WStringToString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # char[] WStringToUTF8( const wchar_t str[] )
-@native(name="WStringToUTF8", ret=pfp.fields.String)
+@native(name="WStringToUTF8", ret=C.CString)
 def WStringToUTF8(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int WStrlen( const wchar_t s[] )
-@native(name="WStrlen", ret=pfp.fields.Int)
+@native(name="WStrlen", ret=C.Int)
 def WStrlen(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int WStrncmp( const wchar_t s1[], const wchar_t s2[], int n )
-@native(name="WStrncmp", ret=pfp.fields.Int)
+@native(name="WStrncmp", ret=C.Int)
 def WStrncmp(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WStrncpy( wchar_t dest[], const wchar_t src[], int n )
-@native(name="WStrncpy", ret=pfp.fields.Void)
+@native(name="WStrncpy", ret=C.Pass)
 def WStrncpy(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int WStrnicmp( const wchar_t s1[], const wchar_t s2[], int n )
-@native(name="WStrnicmp", ret=pfp.fields.Int)
+@native(name="WStrnicmp", ret=C.Int)
 def WStrnicmp(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int WStrstr( const wchar_t s1[], const wchar_t s2[] )
-@native(name="WStrstr", ret=pfp.fields.Int)
+@native(name="WStrstr", ret=C.Int)
 def WStrstr(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # wchar_t[] WSubStr( const wchar_t str[], int start, int count=-1 )
-@native(name="WSubStr", ret=pfp.fields.WString)
+@native(name="WSubStr", ret=C.CString)
 def WSubStr(params, ctxt, scope, stream, coord):
     raise NotImplementedError()

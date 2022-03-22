@@ -13,7 +13,7 @@ import os
 import six
 
 
-from pfp.fields import BitfieldRW, NumberBase
+# from pfp.fields import BitfieldRW, NumberBase
 from pfp.bitwrap import BitwrappedStream
 from pfp.utils import timeit
 

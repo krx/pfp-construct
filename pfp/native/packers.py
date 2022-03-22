@@ -5,13 +5,13 @@ import zlib
 import six
 
 from pfp.native import native
-import pfp.fields
+# import pfp.fields
 from pfp.dbg import PfpDbg
 import pfp.utils as utils
 import pfp.errors as errors
+import construct as C
 
-
-@native(name="PackerGZip", ret=pfp.fields.Array)
+@native(name="PackerGZip", ret=C.Array)
 def packer_gzip(params, ctxt, scope, stream, coord):
     """``PackerGZip`` - implements both unpacking and packing. Can be used
     as the ``packer`` for a field. When packing, concats the build output
@@ -43,7 +43,7 @@ def packer_gzip(params, ctxt, scope, stream, coord):
         return unpack_gzip(params[1:], ctxt, scope, stream, coord)
 
 
-@native(name="PackGZip", ret=pfp.fields.Array)
+@native(name="PackGZip", ret=C.Array)
 def pack_gzip(params, ctxt, scope, stream, coord):
     """``PackGZip`` - Concats the build output of all params and gzips the
     resulting data, returning a char array.
@@ -67,7 +67,7 @@ def pack_gzip(params, ctxt, scope, stream, coord):
     return zlib.compress(built)
 
 
-@native(name="UnpackGZip", ret=pfp.fields.Array)
+@native(name="UnpackGZip", ret=C.Array)
 def unpack_gzip(params, ctxt, scope, stream, coord):
     """``UnpackGZip`` - Concats the build output of all params and gunzips the
     resulting data, returning a char array.

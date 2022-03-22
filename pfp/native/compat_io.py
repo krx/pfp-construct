@@ -11,24 +11,26 @@ import six
 import sys
 
 from pfp.native import native
-import pfp.fields
+# import pfp.fields
+import pfp.interp
 import pfp.errors as errors
 import pfp.bitwrap as bitwrap
+import construct as C
 
 # http://www.sweetscape.com/010editor/manual/FuncIO.htm
 
 # void BigEndian()
-@native(name="BigEndian", ret=pfp.fields.Void)
+@native(name="BigEndian", ret=C.Pass)
 def BigEndian(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
             coord, "0 arguments", "{} args".format(len(params))
         )
-    pfp.fields.NumberBase.endian = pfp.fields.BIG_ENDIAN
+    pfp.interp.Endian.current = pfp.interp.Endian.BIG
 
 
 # void BitfieldDisablePadding()
-@native(name="BitfieldDisablePadding", ret=pfp.fields.Void, send_interp=True)
+@native(name="BitfieldDisablePadding", ret=C.Pass, send_interp=True)
 def BitfieldDisablePadding(params, ctxt, scope, stream, coord, interp):
     if len(params) > 0:
         raise errors.InvalidArguments(
@@ -38,7 +40,7 @@ def BitfieldDisablePadding(params, ctxt, scope, stream, coord, interp):
 
 
 # void BitfieldEnablePadding()
-@native(name="BitfieldEnablePadding", ret=pfp.fields.Void, send_interp=True)
+@native(name="BitfieldEnablePadding", ret=C.Pass, send_interp=True)
 def BitfieldEnablePadding(params, ctxt, scope, stream, coord, interp):
     if len(params) > 0:
         raise errors.InvalidArguments(
@@ -48,7 +50,7 @@ def BitfieldEnablePadding(params, ctxt, scope, stream, coord, interp):
 
 
 # void BitfieldLeftToRight()
-@native(name="BitfieldLeftToRight", ret=pfp.fields.Void, send_interp=True)
+@native(name="BitfieldLeftToRight", ret=C.Pass, send_interp=True)
 def BitfieldLeftToRight(params, ctxt, scope, stream, coord, interp):
     if len(params) > 0:
         raise errors.InvalidArguments(
@@ -58,7 +60,7 @@ def BitfieldLeftToRight(params, ctxt, scope, stream, coord, interp):
 
 
 # void BitfieldRightToLeft()
-@native(name="BitfieldRightToLeft", ret=pfp.fields.Void, send_interp=True)
+@native(name="BitfieldRightToLeft", ret=C.Pass, send_interp=True)
 def BitfieldRightToLeft(params, ctxt, scope, stream, coord, interp):
     if len(params) > 0:
         raise errors.InvalidArguments(
@@ -68,43 +70,43 @@ def BitfieldRightToLeft(params, ctxt, scope, stream, coord, interp):
 
 
 # double ConvertBytesToDouble( uchar byteArray[] )
-@native(name="ConvertBytesToDouble", ret=pfp.fields.Double)
+@native(name="ConvertBytesToDouble", ret=C.Double)
 def ConvertBytesToDouble(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # float ConvertBytesToFloat( uchar byteArray[] )
-@native(name="ConvertBytesToFloat", ret=pfp.fields.Float)
+@native(name="ConvertBytesToFloat", ret=C.Single)
 def ConvertBytesToFloat(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # hfloat ConvertBytesToHFloat( uchar byteArray[] )
-@native(name="ConvertBytesToHFloat", ret=pfp.fields.Float)
+@native(name="ConvertBytesToHFloat", ret=C.Single)
 def ConvertBytesToHFloat(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int ConvertDataToBytes( data_type value, uchar byteArray[] )
-@native(name="ConvertDataToBytes", ret=pfp.fields.Int)
+@native(name="ConvertDataToBytes", ret=C.Int)
 def ConvertDataToBytes(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void DeleteBytes( int64 start, int64 size )
-@native(name="DeleteBytes", ret=pfp.fields.Void)
+@native(name="DeleteBytes", ret=C.Pass)
 def DeleteBytes(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int DirectoryExists( string dir )
-@native(name="DirectoryExists", ret=pfp.fields.Int)
+@native(name="DirectoryExists", ret=C.Int)
 def DirectoryExists(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int FEof()
-@native(name="FEof", ret=pfp.fields.Int)
+@native(name="FEof", ret=C.Int)
 def FEof(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
@@ -120,7 +122,7 @@ def FEof(params, ctxt, scope, stream, coord):
 
 
 # int64 FileSize()
-@native(name="FileSize", ret=pfp.fields.Int64)
+@native(name="FileSize", ret=C.Long)
 def FileSize(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
@@ -130,19 +132,19 @@ def FileSize(params, ctxt, scope, stream, coord):
 
 
 # TFileList FindFiles( string dir, string filter )
-@native(name="FindFiles", ret=pfp.fields.Void)
+@native(name="FindFiles", ret=C.Pass)
 def FindFiles(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int FPrintf( int fileNum, char format[], ... )
-@native(name="FPrintf", ret=pfp.fields.Int)
+@native(name="FPrintf", ret=C.Int)
 def FPrintf(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int FSeek( int64 pos )
-@native(name="FSeek", ret=pfp.fields.Int)
+@native(name="FSeek", ret=C.Int)
 def FSeek(params, ctxt, scope, stream, coord):
     """Returns 0 if successful or -1 if the address is out of range
     """
@@ -186,7 +188,7 @@ def FSeek(params, ctxt, scope, stream, coord):
         del ctxt._pfp__children_map[old_name]
 
     tmp_stream = bitwrap.BitwrappedStream(six.BytesIO(data))
-    new_field = pfp.fields.Array(len(data), pfp.fields.Char, tmp_stream)
+    new_field = pfp.fields.Array(len(data), C.Byte, tmp_stream)
     ctxt._pfp__add_child(skipped_name, new_field, stream)
     scope.add_var(skipped_name, new_field)
 
@@ -194,7 +196,7 @@ def FSeek(params, ctxt, scope, stream, coord):
 
 
 # int FSkip( int64 offset )
-@native(name="FSkip", ret=pfp.fields.Int)
+@native(name="FSkip", ret=C.Int)
 def FSkip(params, ctxt, scope, stream, coord):
     """Returns 0 if successful or -1 if the address is out of range
     """
@@ -211,65 +213,65 @@ def FSkip(params, ctxt, scope, stream, coord):
 
 
 # int64 FTell()
-@native(name="FTell", ret=pfp.fields.Int64)
+@native(name="FTell", ret=C.Long)
 def FTell(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
             coord, "0 arguments", "{} args".format(len(params))
         )
-    return stream.tell()
+    return C.Tell()
 
 
 # void InsertBytes( int64 start, int64 size, uchar value=0 )
-@native(name="InsertBytes", ret=pfp.fields.Void)
+@native(name="InsertBytes", ret=C.Pass)
 def InsertBytes(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int IsBigEndian()
-@native(name="IsBigEndian", ret=pfp.fields.Int)
+@native(name="IsBigEndian", ret=C.Int)
 def IsBigEndian(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
             coord, "0 arguments", "{} args".format(len(params))
         )
-    if pfp.fields.NumberBase.endian == pfp.fields.BIG_ENDIAN:
+    if pfp.interp.Endian.current == pfp.interp.Endian.BIG:
         return 1
     else:
         return 0
 
 
 # int IsLittleEndian()
-@native(name="IsLittleEndian", ret=pfp.fields.Int)
+@native(name="IsLittleEndian", ret=C.Int)
 def IsLittleEndian(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
             coord, "0 arguments", "{} args".format(len(params))
         )
-    if pfp.fields.NumberBase.endian == pfp.fields.LITTLE_ENDIAN:
+    if pfp.interp.Endian.current == pfp.interp.Endian.LITTLE:
         return 0
     else:
         return 1
 
 
 # void LittleEndian()
-@native(name="LittleEndian", ret=pfp.fields.Void)
+@native(name="LittleEndian", ret=C.Pass)
 def LittleEndian(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
             coord, "0 arguments", "{} args".format(len(params))
         )
-    pfp.fields.NumberBase.endian = pfp.fields.LITTLE_ENDIAN
+    pfp.interp.Endian.current = pfp.interp.Endian.LITTLE
 
 
 # int MakeDir( string dir )
-@native(name="MakeDir", ret=pfp.fields.Int)
+@native(name="MakeDir", ret=C.Int)
 def MakeDir(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void OverwriteBytes( int64 start, int64 size, uchar value=0 )
-@native(name="OverwriteBytes", ret=pfp.fields.Void)
+@native(name="OverwriteBytes", ret=C.Pass)
 def OverwriteBytes(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
@@ -296,91 +298,92 @@ def _read_data(params, stream, cls, coord):
 
 
 # char ReadByte( int64 pos=FTell() )
-@native(name="ReadByte", ret=pfp.fields.Char)
+@native(name="ReadByte", ret=C.Byte)
 def ReadByte(params, ctxt, scope, stream, coord):
-    return _read_data(params, stream, pfp.fields.Char, coord)
+    return _read_data(params, stream, C.Byte, coord)
 
 
 # double ReadDouble( int64 pos=FTell() )
-@native(name="ReadDouble", ret=pfp.fields.Double)
+@native(name="ReadDouble", ret=C.Double)
 def ReadDouble(params, ctxt, scope, stream, coord):
-    return _read_data(params, stream, pfp.fields.Double, coord)
+    return _read_data(params, stream, C.Double, coord)
 
 
 # float ReadFloat( int64 pos=FTell() )
-@native(name="ReadFloat", ret=pfp.fields.Float)
+@native(name="ReadFloat", ret=C.Single)
 def ReadFloat(params, ctxt, scope, stream, coord):
-    return _read_data(params, stream, pfp.fields.Float, coord)
+    return _read_data(params, stream, C.Single, coord)
 
 
 # hfloat ReadHFloat( int64 pos=FTell() )
-@native(name="ReadHFloat", ret=pfp.fields.Float)
+@native(name="ReadHFloat", ret=C.Single)
 def ReadHFloat(params, ctxt, scope, stream, coord):
-    return _read_data(params, stream, pfp.fields.Float, coord)
+    return _read_data(params, stream, C.Single, coord)
 
 
 # int ReadInt( int64 pos=FTell() )
-@native(name="ReadInt", ret=pfp.fields.Int)
+@native(name="ReadInt", ret=C.Int)
 def ReadInt(params, ctxt, scope, stream, coord):
-    return _read_data(params, stream, pfp.fields.Int, coord)
+    return _read_data(params, stream, C.Int, coord)
 
 
 # int64 ReadInt64( int64 pos=FTell() )
-@native(name="ReadInt64", ret=pfp.fields.Int64)
+@native(name="ReadInt64", ret=C.Long)
 def ReadInt64(params, ctxt, scope, stream, coord):
-    return _read_data(params, stream, pfp.fields.Int64, coord)
+    return _read_data(params, stream, C.Long, coord)
 
 
 # int64 ReadQuad( int64 pos=FTell() )
-@native(name="ReadQuad", ret=pfp.fields.Int64)
+@native(name="ReadQuad", ret=C.Long)
 def ReadQuad(params, ctxt, scope, stream, coord):
-    return _read_data(params, stream, pfp.fields.Int64, coord)
+    return _read_data(params, stream, C.Long, coord)
 
 
 # short ReadShort( int64 pos=FTell() )
-@native(name="ReadShort", ret=pfp.fields.Short)
+@native(name="ReadShort", ret=C.Short)
 def ReadShort(params, ctxt, scope, stream, coord):
     return _read_data(params, stream, pfp.fields.Short, coord)
 
 
 # uchar ReadUByte( int64 pos=FTell() )
-@native(name="ReadUByte", ret=pfp.fields.UChar)
+@native(name="ReadUByte", ret=C.Byte)
 def ReadUByte(params, ctxt, scope, stream, coord):
     return _read_data(params, stream, pfp.fields.UChar, coord)
 
 
 # uint ReadUInt( int64 pos=FTell() )
-@native(name="ReadUInt", ret=pfp.fields.UInt)
+@native(name="ReadUInt", ret=C.Int32ub)
 def ReadUInt(params, ctxt, scope, stream, coord):
-    return _read_data(params, stream, pfp.fields.UInt, coord)
+    return C.Peek(C.Int32ul if pfp.interp.Endian.is_LE() else C.Int32ub)
+    # return _read_data(params, stream, pfp.fields.UInt, coord)
 
 
 # uint64 ReadUInt64( int64 pos=FTell() )
-@native(name="ReadUInt64", ret=pfp.fields.UInt64)
+@native(name="ReadUInt64", ret=C.Int64ub)
 def ReadUInt64(params, ctxt, scope, stream, coord):
     return _read_data(params, stream, pfp.fields.UInt64, coord)
 
 
 # uint64 ReadUQuad( int64 pos=FTell() )
-@native(name="ReadUQuad", ret=pfp.fields.UInt64)
+@native(name="ReadUQuad", ret=C.Int64ub)
 def ReadUQuad(params, ctxt, scope, stream, coord):
     return _read_data(params, stream, pfp.fields.UInt64, coord)
 
 
 # ushort ReadUShort( int64 pos=FTell() )
-@native(name="ReadUShort", ret=pfp.fields.UShort)
+@native(name="ReadUShort", ret=C.Int16ub)
 def ReadUShort(params, ctxt, scope, stream, coord):
     return _read_data(params, stream, pfp.fields.UShort, coord)
 
 
 # char[] ReadLine( int64 pos, int maxLen=-1, int includeLinefeeds=true )
-@native(name="ReadLine", ret=pfp.fields.String)
+@native(name="ReadLine", ret=C.CString)
 def ReadLine(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void ReadBytes( uchar buffer[], int64 pos, int n )
-@native(name="ReadBytes", ret=pfp.fields.Void)
+@native(name="ReadBytes", ret=C.Pass)
 def ReadBytes(params, ctxt, scope, stream, coord):
     if len(params) != 3:
         raise errors.InvalidArguments(
@@ -392,19 +395,19 @@ def ReadBytes(params, ctxt, scope, stream, coord):
         raise errors.InvalidArguments(
             coord, "buffer must be an array", params[0].__class__.__name__
         )
-    if params[0].field_cls not in [pfp.fields.UChar, pfp.fields.Char]:
+    if params[0].field_cls not in [pfp.fields.UChar, C.Byte]:
         raise errors.InvalidArguments(
             coord,
             "buffer must be an array of uchar or char",
             params[0].field_cls.__name__,
         )
 
-    if not isinstance(params[1], pfp.fields.IntBase):
+    if not isinstance(params[1], C.IntBase):
         raise errors.InvalidArguments(
             coord, "pos must be an integer", params[1].__class__.__name__
         )
 
-    if not isinstance(params[2], pfp.fields.IntBase):
+    if not isinstance(params[2], C.IntBase):
         raise errors.InvalidArguments(
             coord, "n must be an integer", params[2].__class__.__name__
         )
@@ -423,186 +426,186 @@ def ReadBytes(params, ctxt, scope, stream, coord):
 
 
 # char[] ReadString( int64 pos, int maxLen=-1 )
-@native(name="ReadString", ret=pfp.fields.String)
+@native(name="ReadString", ret=C.CString)
 def ReadString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int ReadStringLength( int64 pos, int maxLen=-1 )
-@native(name="ReadStringLength", ret=pfp.fields.Int)
+@native(name="ReadStringLength", ret=C.Int)
 def ReadStringLength(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # wstring ReadWLine( int64 pos, int maxLen=-1 )
-@native(name="ReadWLine", ret=pfp.fields.WString)
+@native(name="ReadWLine", ret=C.CString)
 def ReadWLine(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # wstring ReadWString( int64 pos, int maxLen=-1 )
-@native(name="ReadWString", ret=pfp.fields.WString)
+@native(name="ReadWString", ret=C.CString)
 def ReadWString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int ReadWStringLength( int64 pos, int maxLen=-1 )
-@native(name="ReadWStringLength", ret=pfp.fields.Int)
+@native(name="ReadWStringLength", ret=C.Int)
 def ReadWStringLength(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int64 TextAddressToLine( int64 address )
-@native(name="TextAddressToLine", ret=pfp.fields.Int64)
+@native(name="TextAddressToLine", ret=C.Long)
 def TextAddressToLine(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int TextAddressToColumn( int64 address )
-@native(name="TextAddressToColumn", ret=pfp.fields.Int)
+@native(name="TextAddressToColumn", ret=C.Int)
 def TextAddressToColumn(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int64 TextColumnToAddress( int64 line, int column )
-@native(name="TextColumnToAddress", ret=pfp.fields.Int64)
+@native(name="TextColumnToAddress", ret=C.Long)
 def TextColumnToAddress(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int64 TextGetNumLines()
-@native(name="TextGetNumLines", ret=pfp.fields.Int64)
+@native(name="TextGetNumLines", ret=C.Long)
 def TextGetNumLines(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int TextGetLineSize( int64 line, int includeLinefeeds=true )
-@native(name="TextGetLineSize", ret=pfp.fields.Int)
+@native(name="TextGetLineSize", ret=C.Int)
 def TextGetLineSize(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int64 TextLineToAddress( int64 line )
-@native(name="TextLineToAddress", ret=pfp.fields.Int64)
+@native(name="TextLineToAddress", ret=C.Long)
 def TextLineToAddress(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int TextReadLine( char buffer[], int64 line, int maxsize, int includeLinefeeds=true )
-@native(name="TextReadLine", ret=pfp.fields.Int)
+@native(name="TextReadLine", ret=C.Int)
 def TextReadLine(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # int TextReadLineW( wchar_t buffer[], int64 line, int maxsize, int includeLinefeeds=true )
-@native(name="TextReadLineW", ret=pfp.fields.Int)
+@native(name="TextReadLineW", ret=C.Int)
 def TextReadLineW(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void TextWriteLine( const char buffer[], int64 line, int includeLinefeeds=true )
-@native(name="TextWriteLine", ret=pfp.fields.Void)
+@native(name="TextWriteLine", ret=C.Pass)
 def TextWriteLine(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void TextWriteLineW( const wchar_t buffer[], int64 line, int includeLinefeeds=true )
-@native(name="TextWriteLineW", ret=pfp.fields.Void)
+@native(name="TextWriteLineW", ret=C.Pass)
 def TextWriteLineW(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteByte( int64 pos, char value )
-@native(name="WriteByte", ret=pfp.fields.Void)
+@native(name="WriteByte", ret=C.Pass)
 def WriteByte(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteDouble( int64 pos, double value )
-@native(name="WriteDouble", ret=pfp.fields.Void)
+@native(name="WriteDouble", ret=C.Pass)
 def WriteDouble(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteFloat( int64 pos, float value )
-@native(name="WriteFloat", ret=pfp.fields.Void)
+@native(name="WriteFloat", ret=C.Pass)
 def WriteFloat(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteHFloat( int64 pos, float value )
-@native(name="WriteHFloat", ret=pfp.fields.Void)
+@native(name="WriteHFloat", ret=C.Pass)
 def WriteHFloat(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteInt( int64 pos, int value )
-@native(name="WriteInt", ret=pfp.fields.Void)
+@native(name="WriteInt", ret=C.Pass)
 def WriteInt(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteInt64( int64 pos, int64 value )
-@native(name="WriteInt64", ret=pfp.fields.Void)
+@native(name="WriteInt64", ret=C.Pass)
 def WriteInt64(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteQuad( int64 pos, int64 value )
-@native(name="WriteQuad", ret=pfp.fields.Void)
+@native(name="WriteQuad", ret=C.Pass)
 def WriteQuad(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteShort( int64 pos, short value )
-@native(name="WriteShort", ret=pfp.fields.Void)
+@native(name="WriteShort", ret=C.Pass)
 def WriteShort(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteUByte( int64 pos, uchar value )
-@native(name="WriteUByte", ret=pfp.fields.Void)
+@native(name="WriteUByte", ret=C.Pass)
 def WriteUByte(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteUInt( int64 pos, uint value )
-@native(name="WriteUInt", ret=pfp.fields.Void)
+@native(name="WriteUInt", ret=C.Pass)
 def WriteUInt(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteUInt64( int64 pos, uint64 value )
-@native(name="WriteUInt64", ret=pfp.fields.Void)
+@native(name="WriteUInt64", ret=C.Pass)
 def WriteUInt64(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteUQuad( int64 pos, uint64 value )
-@native(name="WriteUQuad", ret=pfp.fields.Void)
+@native(name="WriteUQuad", ret=C.Pass)
 def WriteUQuad(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteUShort( int64 pos, ushort value )
-@native(name="WriteUShort", ret=pfp.fields.Void)
+@native(name="WriteUShort", ret=C.Pass)
 def WriteUShort(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteBytes( const uchar buffer[], int64 pos, int n )
-@native(name="WriteBytes", ret=pfp.fields.Void)
+@native(name="WriteBytes", ret=C.Pass)
 def WriteBytes(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteString( int64 pos, const char value[] )
-@native(name="WriteString", ret=pfp.fields.Void)
+@native(name="WriteString", ret=C.Pass)
 def WriteString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteWString( int64 pos, const wstring value )
-@native(name="WriteWString", ret=pfp.fields.Void)
+@native(name="WriteWString", ret=C.Pass)
 def WriteWString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()

@@ -6,7 +6,7 @@ import collections
 import os
 import sys
 
-import pfp.fields as fields
+# import pfp.fields as fields
 import pfp.errors as errors
 import pfp.utils as utils
 

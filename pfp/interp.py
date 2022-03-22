@@ -6,7 +6,9 @@ Python format parser
 
 import collections
 import copy
+from email.mime import base
 import glob
+import itertools
 import logging
 import os
 import re
@@ -21,7 +23,8 @@ from py010parser import c_ast as AST
 import pfp
 import pfp.bitwrap as bitwrap
 import pfp.errors as errors
-import pfp.fields as fields
+# import pfp.fields as fields
+import construct as C
 import pfp.functions as functions
 import pfp.native as native
 import pfp.utils as utils
@@ -82,9 +85,15 @@ def StructUnionTypeRef(curr_scope, typedef_name, refd_name, interp, node):
     a ``ME`` instance is actually declared.
     """
     if isinstance(node, AST.Struct):
-        cls = fields.Struct
+        res = Struct()
     elif isinstance(node, AST.Union):
-        cls = fields.Union
+        res = C.Union(None)
+
+
+    for decl in node.decls:
+        interp._handle_node(decl, ctxt=res)
+
+    return res
 
     def __new__(cls_, *args, **kwargs):
         refd_type = curr_scope.get_type(refd_name)
@@ -119,90 +128,108 @@ def StructUnionTypeRef(curr_scope, typedef_name, refd_name, interp, node):
     return new_class
 
 
-def StructUnionDef(typedef_name, interp, node, overrides=None, cls=None):
-    if overrides is None:
-        overrides = {}
+def StructUnionDef(typedef_name, interp, node):
     if isinstance(node, AST.Struct):
-        if cls is None:
-            cls = fields.Struct
-        decls = StructDecls(node.decls, node.coord)
+        res = Struct()
     elif isinstance(node, AST.Union):
-        if cls is None:
-            cls = fields.Union
-        decls = UnionDecls(node.decls, node.coord)
+        res = C.Union(None)
 
-    # this is so that we can have all nested structs added to
-    # the root DOM, even if there's an error in parsing the data.
-    # If we didn't do this, any errors parsing the data would cause
-    # the new struct to not be added to its parent, and the user would
-    # not be able to see how far the script got
-    def __init__(self, stream=None, metadata_processor=None, do_init=True):
-        cls.__init__(
-            self,
-            stream,
-            metadata_processor=metadata_processor,
-        )
+    for decl in node.decls:
+        interp._handle_node(decl, ctxt=res)
 
-        if do_init:
-            self._pfp__init(stream)
+    return res
 
-    def _pfp__init(self, stream):
-        self._pfp__interp._handle_node(decls, ctxt=self, stream=stream)
+    # if overrides is None:
+    #     overrides = {}
+    # if isinstance(node, AST.Struct):
+    #     if cls is None:
+    #         cls = C.Struct
+    #     decls = StructDecls(node.decls, node.coord)
+    # elif isinstance(node, AST.Union):
+    #     if cls is None:
+    #         cls = C.Union
+    #     decls = UnionDecls(node.decls, node.coord)
 
-    cls_members = {
-        "__init__": __init__,
-        "_pfp__init": _pfp__init,
-        "_pfp__node": node,
-        "_pfp__interp": interp,
-    }
+    # # this is so that we can have all nested structs added to
+    # # the root DOM, even if there's an error in parsing the data.
+    # # If we didn't do this, any errors parsing the data would cause
+    # # the new struct to not be added to its parent, and the user would
+    # # not be able to see how far the script got
+    # def __init__(self, stream=None, metadata_processor=None, do_init=True):
+    #     cls.__init__(
+    #         self,
+    #         stream,
+    #         metadata_processor=metadata_processor,
+    #     )
 
-    for k, v in six.iteritems(overrides or {}):
-        if k in cls_members:
-            cls_members[k + "_orig"] = cls_members[k]
-        cls_members[k] = v
+    #     if do_init:
+    #         self._pfp__init(stream)
 
-    new_class = type(
-        typedef_name,
-        (cls,),
-        cls_members,
-    )
-    return new_class
+    # def _pfp__init(self, stream):
+    #     self._pfp__interp._handle_node(decls, ctxt=self, stream=stream)
+
+    # cls_members = {
+    #     "__init__": __init__,
+    #     "_pfp__init": _pfp__init,
+    #     "_pfp__node": node,
+    #     "_pfp__interp": interp,
+    # }
+
+    # for k, v in six.iteritems(overrides or {}):
+    #     if k in cls_members:
+    #         cls_members[k + "_orig"] = cls_members[k]
+    #     cls_members[k] = v
+
+    # new_class = type(
+    #     typedef_name,
+    #     (cls,),
+    #     cls_members,
+    # )
+    # return new_class
+
+    # print(interp._handle_node(decls))
 
 
 def EnumDef(typedef_name, base_cls, enum_vals):
-    new_class = type(
-        typedef_name,
-        (fields.Enum,),
-        {
-            "signed": base_cls.signed,
-            "width": base_cls.width,
-            "endian": base_cls.endian,
-            "format": base_cls.format,
-            "enum_vals": enum_vals,
-            "enum_cls": base_cls,
-        },
-    )
-    return new_class
+    return C.Enum(base_cls, **enum_vals)
+    # print(enum_vals)
+    # new_class = type(
+    #     typedef_name,
+    #     (fields.Enum,),
+    #     {
+    #         "signed": base_cls.signed,
+    #         "width": base_cls.width,
+    #         "endian": base_cls.endian,
+    #         "format": base_cls.format,
+    #         "enum_vals": enum_vals,
+    #         "enum_cls": base_cls,
+    #     },
+    # )
+    # return new_class
 
 
 def ArrayDecl(item_cls, item_count):
-    width = fields.PYVAL(item_count)
+    if item_cls is C.Byte:
+        # Special case for byte arrays
+        return C.Bytes(item_count)
+    return C.Array(item_count, item_cls)
+    # width = fields.PYVAL(item_count)
 
-    def __init__(self, stream=None, metadata_processor=None):
-        fields.Array.__init__(
-            self,
-            self.width,
-            self.field_cls,
-            stream,
-            metadata_processor=metadata_processor,
-        )
+    # def __init__(self, stream=None, metadata_processor=None):
+    #     fields.Array.__init__(
+    #         self,
+    #         self.width,
+    #         self.field_cls,
+    #         stream,
+    #         metadata_processor=metadata_processor,
+    #     )
 
-    new_class = type(
-        "Array_{}_{}".format(item_cls.__name__, width),
-        (fields.Array,),
-        {"__init__": __init__, "width": width, "field_cls": item_cls},
-    )
-    return new_class
+    # new_class = type(
+    #     "Array_{}_{}".format(item_cls.__name__, width),
+    #     (fields.Array,),
+    #     {"__init__": __init__, "width": width, "field_cls": item_cls},
+    # )
+    # return new_class
 
 
 def LazyField(lookup_name, scope):
@@ -429,12 +456,12 @@ class Scope(object):
         self._dlog("popping scope, scope level = {}".format(self.level()))
         self._curr_scope = self._scope_stack[-1]
         return res
-    
+
     def clear_meta(self):
         """Clear metadata about the current statement
         """
         self._curr_scope["meta"] = {}
-    
+
     def push_meta(self, meta_name, meta_value):
         """Push metadata about the current statement onto the metadata stack
         for the current statement. Mostly used for tracking integer promotion
@@ -497,7 +524,7 @@ class Scope(object):
 
         """
         self._dlog("adding local '{}'".format(field_name))
-        field._pfp__name = field_name
+        # field._pfp__name = field_name
         # TODO do we allow clobbering of locals???
         self._curr_scope["vars"][field_name] = field
 
@@ -721,8 +748,8 @@ class PfpInterp(object):
                 continue
 
             mod = getattr(mod_base, basename)
-            setattr(mod, "PYVAL", fields.get_value)
-            setattr(mod, "PYSTR", fields.get_str)
+            # setattr(mod, "PYVAL", fields.get_value)
+            # setattr(mod, "PYSTR", fields.get_str)
 
     def __init__(self, debug=False, parser=None, int3=True):
         """Create a new instance of the ``PfpInterp`` class.
@@ -864,7 +891,7 @@ class PfpInterp(object):
             self._dlog("parsed template into ast")
 
         res = self._run(keep_successful)
-        res._pfp__finalize()
+        # res._pfp__finalize()
         return res
 
     def step_over(self):
@@ -1037,6 +1064,7 @@ class PfpInterp(object):
         #                IdentifierType: ['char']
 
         self._dlog("interpreting template")
+        self._ast.show()
 
         try:
             # it is important to pass the stream in as the stream
@@ -1047,7 +1075,7 @@ class PfpInterp(object):
             res = self._root
         except errors.InterpExit as e:
             res = self._root
-        except Exception as e:
+        '''except Exception as e:
             if keep_successfull:
                 # return the root and set _pfp__error
                 res = self._root
@@ -1070,7 +1098,7 @@ class PfpInterp(object):
                     ),
                     traceback,
                 )
-
+'''
         # final drop-in after everything has executed
         if self._break_type != self.BREAK_NONE:
             self.debugger.cmdloop("execution finished")
@@ -1166,9 +1194,9 @@ class PfpInterp(object):
         :returns: TODO
 
         """
-        self._root = ctxt = fields.Dom(stream)
+        self._root = ctxt = '_root' / Struct()
         ctxt._pfp__scope = scope
-        self._root._pfp__name = "__root"
+        # self._root._pfp__name = "__root"
         self._root._pfp__interp = self
         self._dlog(
             "handling file AST with {} children".format(len(node.children()))
@@ -1196,9 +1224,10 @@ class PfpInterp(object):
                 continue
             self._handle_node(child, scope, ctxt, stream)
 
-        ctxt._pfp__process_fields_metadata()
+        pprint_construct(ctxt)
+        # ctxt._pfp__process_fields_metadata()
 
-        return ctxt
+        return ctxt.parse_stream(stream)
 
     def _handle_empty_statement(self, node, scope, ctxt, stream):
         """Handle empty statements
@@ -1292,35 +1321,37 @@ class PfpInterp(object):
 
         if getattr(node, "bitsize", None) is not None:
             bitsize = self._handle_node(node.bitsize, scope, ctxt, stream)
-            has_prev = len(ctxt._pfp__children) > 0
+            node.show()
+            print(bitsize, field, field_name)
+            # has_prev = len(ctxt._pfp__children) > 0
 
-            bitfield_rw = None
-            if has_prev:
-                prev = ctxt._pfp__children[-1]
-                # if it was a bitfield as well
-                # TODO I don't think this will handle multiple bitfield groups in a row.
-                # E.g.
-                #     char a: 8, b:8;
-                #    char c: 8, d:8;
-                if (
-                    isinstance(prev, fields.NumberBase)
-                    and
-                    (
-                        (
-                            self._padded_bitfield
-                            and prev.__class__.width == field.width
-                        )
-                        or not self._padded_bitfield
-                    )
-                    and prev.bitsize is not None
-                    and prev.bitfield_rw.reserve_bits(bitsize, stream)
-                ):
-                    bitfield_rw = prev.bitfield_rw
+            # bitfield_rw = None
+            # if has_prev:
+            #     prev = ctxt._pfp__children[-1]
+            #     # if it was a bitfield as well
+            #     # TODO I don't think this will handle multiple bitfield groups in a row.
+            #     # E.g.
+            #     #     char a: 8, b:8;
+            #     #    char c: 8, d:8;
+            #     if (
+            #         isinstance(prev, fields.NumberBase)
+            #         and
+            #         (
+            #             (
+            #                 self._padded_bitfield
+            #                 and prev.__class__.width == field.width
+            #             )
+            #             or not self._padded_bitfield
+            #         )
+            #         and prev.bitsize is not None
+            #         and prev.bitfield_rw.reserve_bits(bitsize, stream)
+            #     ):
+            #         bitfield_rw = prev.bitfield_rw
 
-            # either because there was no previous bitfield, or the previous was full
-            if bitfield_rw is None:
-                bitfield_rw = fields.BitfieldRW(self, field)
-                bitfield_rw.reserve_bits(bitsize, stream)
+            # # either because there was no previous bitfield, or the previous was full
+            # if bitfield_rw is None:
+            #     bitfield_rw = fields.BitfieldRW(self, field)
+            #     bitfield_rw.reserve_bits(bitsize, stream)
 
         if is_forward_declared_struct(node):
             scope.add_type_class(node.type.name, field)
@@ -1333,25 +1364,28 @@ class PfpInterp(object):
         # locals and consts still get a field instance, but DON'T parse the
         # stream!
         elif "local" in node.quals or "const" in node.quals:
-            is_struct = issubclass(field, fields.Struct)
-            if not isinstance(field, fields.Field) and not is_struct:
-                field = field()
+            is_struct = isinstance(field, type) and issubclass(field, C.Struct)
+            # if not isinstance(field, fields.Field) and not is_struct:
+            # if not is_struct:
+                # field = field()
             scope.add_local(field_name, field)
 
             # this should only be able to be done with locals, right?
             # if not, move it to the bottom of the function
             if node.init is not None:
-                val = self._handle_node(node.init, scope, ctxt, stream)
+                val = C.Computed(self._handle_node(node.init, scope, ctxt, stream))
                 if is_struct:
                     field = val
                     scope.add_local(field_name, field)
                 else:
-                    field._pfp__set_value(val)
+                    # field._pfp__set_value(val)
+                    field = val
+                self._add_child(ctxt, field_name, field, stream)
 
-            if "const" in node.quals:
-                field._pfp__freeze()
+            # if "const" in node.quals:
+            #     field._pfp__freeze()
 
-            field._pfp__interp = self
+            #field._pfp__interp = self
 
         elif isinstance(field, functions.Function):
             # eh, just add it as a local...
@@ -1365,29 +1399,30 @@ class PfpInterp(object):
 
             # by this point, structs are already instantiated (they need to be
             # in order to set the new context)
-            if not isinstance(field, fields.Field):
-                if issubclass(field, fields.NumberBase):
+            # if not isinstance(field, fields.Field):
+            if not field.__class__.__module__ == '__builtin__':
+                if issubclass(field.__class__, C.FormatField):
                     # use the default bitfield direction
                     if self._bitfield_direction is self.BITFIELD_DIR_DEFAULT:
-                        bitfield_left_right = (
-                            True
-                            if field.endian == fields.BIG_ENDIAN
-                            else False
-                        )
+                        bitfield_left_right = field.fmtstr[0] == '>'
                     else:
                         bitfield_left_right = (
                             self._bitfield_direction
                             is self.BITFIELD_DIR_LEFT_RIGHT
                         )
 
-                    field = field(
-                        stream,
-                        bitsize=bitsize,
-                        metadata_processor=metadata_processor,
-                        bitfield_rw=bitfield_rw,
-                        bitfield_padded=self._padded_bitfield,
-                        bitfield_left_right=bitfield_left_right,
-                    )
+                    # TODO bitfield shit
+                    if bitsize is not None:
+                        field = C.BitsInteger(bitsize)
+                    # field = field.parse_stream(stream)
+                    # field = field(
+                    #     stream,
+                    #     bitsize=bitsize,
+                    #     metadata_processor=metadata_processor,
+                    #     bitfield_rw=bitfield_rw,
+                    #     bitfield_padded=self._padded_bitfield,
+                    #     bitfield_left_right=bitfield_left_right,
+                    # )
 
                 # TODO
                 # for now if there's a struct inside of a union that is being
@@ -1395,11 +1430,12 @@ class PfpInterp(object):
                 # about how far the parsing got. Here we are explicitly checking for
                 # adding structs and unions to a parent union.
                 elif (
-                    (
-                        issubclass(field, fields.Struct)
-                        or issubclass(field, fields.Union)
+                    type(field) is type
+                    and (
+                        issubclass(field, C.Struct)
+                        or issubclass(field, C.Union)
                     )
-                    and not isinstance(ctxt, fields.Union)
+                    and not isinstance(ctxt, C.Union)
                     and hasattr(field, "_pfp__init")
                 ):
 
@@ -1413,8 +1449,8 @@ class PfpInterp(object):
                         metadata_processor=metadata_processor,
                         do_init=False,
                     )
-                    field._pfp__interp = self
-                    field_res = ctxt._pfp__add_child(field_name, field, stream)
+                    # field._pfp__interp = self
+                    field_res = self._add_child(ctxt, field_name, field, stream)
 
                     # when adding a new field to a struct/union/fileast, add it to the
                     # root of the ctxt's scope so that it doesn't get lost by being declared
@@ -1425,19 +1461,22 @@ class PfpInterp(object):
                     field._pfp__init(stream)
                     added_child = True
                 else:
-                    field = field(
-                        stream, metadata_processor=metadata_processor
-                    )
+                    pass
+                    # print(field, stream)
+                    # field = field.parse_stream(stream)
+                    # field = field(
+                    #     stream, metadata_processor=metadata_processor
+                    # )
 
             if not added_child:
-                field._pfp__interp = self
-                field_res = ctxt._pfp__add_child(field_name, field, stream)
-                field_res._pfp__interp = self
+                # field._pfp__interp = self
+                field = self._add_child(ctxt, field_name, field, stream)
+                # field_res._pfp__interp = self
 
                 # when adding a new field to a struct/union/fileast, add it to the
                 # root of the ctxt's scope so that it doesn't get lost by being declared
                 # from within a function
-                scope.add_var(field_name, field_res, root=True)
+                scope.add_var(field_name, field, root=True)
 
                 # this shouldn't be used elsewhere, but should still be explicit with
                 # this flag
@@ -1455,6 +1494,31 @@ class PfpInterp(object):
             pass
 
         return field
+
+    def _add_child(self, ctxt: C.Construct, field_name: str, field, stream):
+        print(ctxt.subcons, field, field_name)
+        for i, sc in enumerate(ctxt.subcons):
+            if sc.name == field_name:
+                if isinstance(sc.subcon, C.Array):
+                    # append to the existing implicit list
+                    assert sc.subcon.subcon == field  # ???
+                    sc.subcon.count += 1
+                    return sc
+                else:
+                    # Create an implicit array with the 2 values
+                    ctxt.subcons[i] = Hoisted(C.Array(2, field), newname=field_name)
+                    return ctxt.subcons[i]
+
+                # Stop once we find one with the right name
+                break
+        else:
+            # First time this name has shown up
+            print(field, field_name)
+            sc = Hoisted(field, newname=field_name)
+            ctxt.subcons.append(sc)
+            # ctxt.subcons.append(C.Probe())
+            return sc
+
 
     def _handle_metadata(self, node, scope, ctxt, stream):
         """Handle metadata for the node
@@ -1593,7 +1657,10 @@ class PfpInterp(object):
         struct = self._handle_node(node.name, scope, ctxt, stream)
 
         try:
-            sub_field = getattr(struct, node.field.name)
+            if node.field.name in struct:
+                sub_field = struct[node.field.name]
+            else:
+                sub_field = next(sc.subcon for sc in struct.subcons if sc.name == node.field.name)
         except AttributeError as e:
             # should be able to access implicit array items by index OR
             # access the last one's members directly without index
@@ -1803,13 +1870,13 @@ class PfpInterp(object):
 
     def _choose_const_int_class(self, val):
         if -0x80000000 < val < 0x80000000:
-            return fields.Int
+            return C.Int32sb
         elif 0 <= val < 0x100000000:
-            return fields.UInt
+            return C.Int32ub
         elif -0x8000000000000000 < val < 0x8000000000000000:
-            return fields.Int64
+            return C.Int64sb
         elif 0 <= val < 0x10000000000000000:
-            return fields.UInt64
+            return C.Int64ub
 
     def _handle_constant(self, node, scope, ctxt, stream):
         """TODO: Docstring for _handle_constant.
@@ -1828,16 +1895,16 @@ class PfpInterp(object):
             # parsed it if it wasn't correct...
             "float": (
                 lambda x: float(x.lower().replace("f", "")),
-                fields.Float,
+                C.Single,
             ),
-            "double": (float, fields.Double),
+            "double": (float, C.Double),
             # cut out the quotes
-            "char": (lambda x: ord(utils.string_escape(x[1:-1])), fields.Char),
+            "char": (lambda x: ord(utils.string_escape(x[1:-1])), C.Byte),
             # TODO should this be unicode?? will probably bite me later...
             # cut out the quotes
             "string": (
                 lambda x: str(utils.string_escape(x[1:-1])),
-                fields.String,
+                str,
             ),
         }
 
@@ -1849,9 +1916,9 @@ class PfpInterp(object):
             if hasattr(field_cls, "__call__") and not type(field_cls) is type:
                 field_cls = field_cls(val)
 
-            field = field_cls()
-            field._pfp__set_value(val)
-            return field
+            # field = field_cls()
+            # field._pfp__set_value(val)
+            return val
 
         raise UnsupportedConstantType(node.coord, node.type)
 
@@ -1911,11 +1978,10 @@ class PfpInterp(object):
             res = switch[node.op](left_val, right_val)
 
         if type(res) is bool:
-            new_res = fields.Int()
             if res:
-                new_res._pfp__set_value(1)
+                new_res = 1
             else:
-                new_res._pfp__set_value(0)
+                new_res = 0
             res = new_res
 
         return res
@@ -1955,31 +2021,38 @@ class PfpInterp(object):
             raise errors.UnsupportedUnaryOperator(node.coord, node.op)
 
         if node.op in special_switch:
-            return special_switch[node.op](node, scope, ctxt, stream)
-
-        field = self._handle_node(node.expr, scope, ctxt, stream)
-        if type(field) is type:
-            field = field()
-        res = switch[node.op](field, 1)
-        if type(res) is bool:
-            new_res = field.__class__()
-            new_res._pfp__set_value(1 if res == True else 0)
-            res = new_res
-        return res
+            field, res = special_switch[node.op](node, scope, ctxt, stream)
+        else:
+            field = self._handle_node(node.expr, scope, ctxt, stream)
+            if type(field) is type:
+                field = field()
+            res = switch[node.op](field, 1)
+            if type(res) is bool:
+                # new_res = field.__class__()
+                # new_res._pfp__set_value(1 if res == True else 0)
+                res = res
+        ctxt.subcons.append(res)
+        return field
 
     def _handle_post_plus_plus(self, node, scope, ctxt, stream):
         field = self._handle_node(node.expr, scope, ctxt, stream)
-        clone = field.__class__()
-        clone._pfp__set_value(field)
-        field += 1
-        return clone
+        name = get_this_name(field)
+
+        def _pp(_, ctx):
+            ctx[name] += 1
+            ctx._obj[name] += 1
+
+        return field, C.Pass * _pp
 
     def _handle_post_minus_minus(self, node, scope, ctxt, stream):
         field = self._handle_node(node.expr, scope, ctxt, stream)
-        clone = field.__class__()
-        clone._pfp__set_value(field)
-        field -= 1
-        return clone
+        name = get_this_name(field)
+
+        def _mm(_, ctx):
+            ctx[name] -= 1
+            ctx._obj[name] -= 1
+
+        return field, C.Pass * _mm
 
     def _handle_parentof(self, node, scope, ctxt, stream):
         """Handle the parentof unary operator
@@ -2002,8 +2075,7 @@ class PfpInterp(object):
         # (parentof a.b.c).a
 
         field = self._handle_node(node.expr, scope, ctxt, stream)
-        parent = field._pfp__parent
-        return parent
+        return field._
 
     def _handle_exists(self, node, scope, ctxt, stream):
         """Handle the exists unary operator
@@ -2055,12 +2127,15 @@ class PfpInterp(object):
 
         """
         if node.name == "__root":
-            return self._root
+            return C._root  # ???
         if node.name == "__this" or node.name == "this":
-            return ctxt
+            return C.this  # TODO: who knows if this works
 
         self._dlog("handling id {}".format(node.name))
         field = scope.get_id(node.name)
+
+        if field is not None and isinstance(field, C.Construct):
+            return C.this[node.name]
 
         is_lazy = getattr(node, "is_lazy", False)
 
@@ -2112,7 +2187,12 @@ class PfpInterp(object):
             x >>= y
 
         def assign_op(x, y):
-            x._pfp__set_value(y)
+            name = x._Path__field
+            def _func(obj, ctx):
+                # Have to update both the actual container and the context
+                ctx[name] = y
+                ctx._obj[name] = y
+            return C.Pass * _func
 
         switch = {
             "+=": add_op,
@@ -2134,7 +2214,7 @@ class PfpInterp(object):
         field = self._handle_node(node.lvalue, scope, ctxt, stream)
         self._dlog("field = {}".format(field))
 
-        scope.push_meta("dest_type", field._pfp__get_class())
+        # scope.push_meta("dest_type", field._pfp__get_class())
 
         value = self._handle_node(
             node.rvalue,
@@ -2150,7 +2230,9 @@ class PfpInterp(object):
             self._dlog("value {}= {}".format(node.op, value))
             if node.op not in switch:
                 raise errors.UnsupportedAssignmentOperator(node.coord, node.op)
-            switch[node.op](field, value)
+            field = switch[node.op](field, value)
+
+        ctxt.subcons.append(field)  # Add the Pass+function to the struct
         return field
 
     def _handle_func_def(self, node, scope, ctxt, stream):
@@ -2265,9 +2347,18 @@ class PfpInterp(object):
         # scope.push()
 
         try:
+            # if isinstance(ctxt, Compound):
+            #     seq = ctxt
+            # else:
+            seq = Compound()
+
             for child in node.children():
                 scope.clear_meta()
-                self._handle_node(child, scope, ctxt, stream)
+                self._handle_node(child, scope, seq, stream)
+
+            # if isinstance(ctxt, Compound):
+                # ctxt.subcons.append(seq)
+            return seq
 
         # in case a return occurs, be sure to pop the scope
         # (returns are implemented by raising an exception)
@@ -2305,27 +2396,28 @@ class PfpInterp(object):
         """
         self._dlog("handling enum")
         if node.type is None:
-            enum_cls = fields.Int
+            enum_cls = C.Int32sb
         else:
             enum_cls = self._handle_node(node.type, scope, ctxt, stream)
 
         enum_vals = {}
-        curr_val = enum_cls()
-        curr_val._pfp__value = 0
+        curr_val = 0
+        # curr_val._pfp__value = 0
         prev_val = None
         for enumerator in node.values.enumerators:
             if enumerator.value is not None:
                 curr_val_parsed = self._handle_node(
                     enumerator.value, scope, ctxt, stream
                 )
-                curr_val = enum_cls()
-                curr_val._pfp__set_value(curr_val_parsed._pfp__value)
+                # curr_val = enum_cls()
+                # curr_val._pfp__set_value(curr_val_parsed._pfp__value)
+                curr_val = curr_val_parsed
             elif prev_val is not None:
                 curr_val = prev_val + 1
-            curr_val.signed = enum_cls.signed
-            curr_val._pfp__freeze()
+            # curr_val.signed = enum_cls.signed
+            # curr_val._pfp__freeze()
             enum_vals[enumerator.name] = curr_val
-            enum_vals[fields.PYVAL(curr_val)] = enumerator.name
+            # enum_vals[curr_val] = enumerator.name
             scope.add_local(enumerator.name, curr_val)
             prev_val = curr_val
 
@@ -2335,7 +2427,7 @@ class PfpInterp(object):
 
         else:
             enum_cls = EnumDef(
-                "enum_" + enum_cls.__name__, enum_cls, enum_vals
+                "enum_" + type(enum_cls).__name__, enum_cls, enum_vals
             )
             # don't add to scope if we don't have a name
 
@@ -2397,12 +2489,19 @@ class PfpInterp(object):
         """
         self._dlog("handling if/ternary_op")
         cond = self._handle_node(node.cond, scope, ctxt, stream)
-        if cond:
-            # there should always be an iftrue
-            return self._handle_node(node.iftrue, scope, ctxt, stream)
+        then = self._handle_node(node.iftrue, scope, ctxt, stream)
+
+        # Use IfThenElse if there's an else block
+        if node.iffalse is not None:
+            stmt = C.IfThenElse(
+                cond,
+                then,
+                self._handle_node(node.iffalse, scope, ctxt, stream)
+            )
         else:
-            if node.iffalse is not None:
-                return self._handle_node(node.iffalse, scope, ctxt, stream)
+            # Just a regular if
+             stmt = C.If(cond, then)
+        ctxt.subcons.append(stmt)
 
     def _handle_for(self, node, scope, ctxt, stream):
         """Handle For nodes
@@ -2415,28 +2514,25 @@ class PfpInterp(object):
 
         """
         self._dlog("handling for")
+        cond = None
+        init = Compound()
+        body = Compound()
+        iter_ = Compound()
+
         if node.init is not None:
-            # perform the init
-            self._handle_node(node.init, scope, ctxt, stream)
+            self._handle_node(node.init, scope, init, stream)
 
-        while node.cond is None or self._handle_node(
-            node.cond, scope, ctxt, stream
-        ):
-            if node.stmt is not None:
-                try:
-                    # do the for body
-                    self._handle_node(node.stmt, scope, ctxt, stream)
-                except errors.InterpBreak as e:
-                    break
+        if node.cond is not None:
+            cond = self._handle_node(node.cond, scope, ctxt, stream)
 
-                # we still need to interpret the "next" statement,
-                # so just pass
-                except errors.InterpContinue as e:
-                    pass
+        if node.stmt is not None:
+            body.subcons.append(self._handle_node(node.stmt, scope, body, stream))
 
-            if node.next is not None:
-                # do the next statement
-                self._handle_node(node.next, scope, ctxt, stream)
+        if node.next is not None:
+            # do the next statement
+            self._handle_node(node.next, scope, iter_, stream)
+
+        ctxt.subcons.append(Loop(cond, init, body, iter_))
 
     def _handle_while(self, node, scope, ctxt, stream):
         """Handle break node
@@ -2449,16 +2545,14 @@ class PfpInterp(object):
 
         """
         self._dlog("handling while")
-        while node.cond is None or self._handle_node(
-            node.cond, scope, ctxt, stream
-        ):
-            if node.stmt is not None:
-                try:
-                    self._handle_node(node.stmt, scope, ctxt, stream)
-                except errors.InterpBreak as e:
-                    break
-                except errors.InterpContinue as e:
-                    pass
+        cond = None
+        body = Compound()
+
+        if node.cond is not None:
+            cond = self._handle_node(node.cond, scope, ctxt, stream)
+        if node.stmt is not None:
+            body.subcons.append(self._handle_node(node.stmt, scope, body, stream))
+        ctxt.subcons.append(Loop(cond=cond, body=body))
 
     def _handle_do_while(self, node, scope, ctxt, stream):
         """Handle break node
@@ -2471,19 +2565,14 @@ class PfpInterp(object):
 
         """
         self._dlog("handling do while")
+        cond = None
+        body = Compound()
 
-        while True:
-            if node.stmt is not None:
-                try:
-                    self._handle_node(node.stmt, scope, ctxt, stream)
-                except errors.InterpBreak as e:
-                    break
-                except errors.InterpContinue as e:
-                    pass
-            if node.cond is not None and not self._handle_node(
-                node.cond, scope, ctxt, stream,
-            ):
-                break
+        if node.cond is not None:
+            cond = self._handle_node(node.cond, scope, ctxt, stream)
+        if node.stmt is not None:
+            body.subcons.append(self._handle_node(node.stmt, scope, body, stream))
+        ctxt.subcons.append(Loop(cond=cond, init=body, body=body))
 
     def _flatten_list(self, l):
         for el in l:
@@ -2507,13 +2596,19 @@ class PfpInterp(object):
         def exec_case(idx, cases):
             # keep executing cases until a break is found,
             # or they've all been executed
+            seq = BreakableCompound()
             for case in cases[idx:]:
                 stmts = case.stmts
                 try:
                     for stmt in stmts:
-                        self._handle_node(stmt, scope, ctxt, stream)
+                        self._handle_node(stmt, scope, seq, stream)
+
+                        # if we just inserted a break, stop
+                        if len(seq.subcons) > 0 and seq.subcons[-1] is Break:
+                            raise errors.InterpBreak
                 except errors.InterpBreak as e:
                     break
+            return seq
 
         def get_stmts(stmts, res=None):
             if res is None:
@@ -2554,19 +2649,27 @@ class PfpInterp(object):
             cases = get_cases(node.stmt.children())
             node.pfp_cases = cases
 
+        sw_cases = {}
+        sw_def = None
         for idx, child in enumerate(cases):
             if child.__class__ == AST.Default:
                 default_idx = idx
                 continue
             elif child.__class__ == AST.Case:
                 expr = self._handle_node(child.expr, scope, ctxt, stream)
-                if expr == cond:
-                    found_match = True
-                    exec_case(idx, cases)
-                    break
+                # if expr == cond:
+                #     found_match = True
+                #     # exec_case(idx, cases)
+                #     break
+                sw_cases[expr] = exec_case(idx, cases)
 
-        if default_idx is not None and not found_match:
-            exec_case(default_idx, cases)
+        if default_idx is not None: # and not found_match:
+            # exec_case(default_idx, cases)
+            sw_def = exec_case(default_idx, cases)
+
+        res = C.Switch(cond, sw_cases, sw_def)
+        ctxt.subcons.append(res)
+        return res
 
     def _handle_break(self, node, scope, ctxt, stream):
         """Handle break node
@@ -2579,7 +2682,8 @@ class PfpInterp(object):
 
         """
         self._dlog("handling break")
-        raise errors.InterpBreak()
+        ctxt.subcons.append(Break)
+        # raise errors.InterpBreak()
 
     def _handle_continue(self, node, scope, ctxt, stream):
         """Handle continue node
@@ -2592,7 +2696,8 @@ class PfpInterp(object):
 
         """
         self._dlog("handling continue")
-        raise errors.InterpContinue()
+        ctxt.subcons.append(Continue)
+        # raise errors.InterpContinue()
 
     def _handle_decl_list(self, node, scope, ctxt, stream):
         """Handle For nodes
@@ -2697,25 +2802,32 @@ class PfpInterp(object):
 
         """
         switch = {
-            "char": "Char",
-            "int": "Int",
-            "long": "Int",
-            "int64": "Int64",
-            "uint64": "UInt64",
+            "char": "Byte",
+            "int": "Int32sb",
+            "long": "Int32sb",
+            "int64": "Int64sb",
+            "uint64": "Int64ub",
             "short": "Short",
             "double": "Double",
-            "float": "Float",
-            "void": "Void",
-            "string": "String",
-            "wstring": "WString",
+            "float": "Single",
+            "void": "Pass",
+            "string": "CString",
+            "wstring": "CString",
         }
+
+        if Endian.is_LE():
+            switch['int'] = 'Int32sl'
+            switch['long'] = 'Int32sl'
+            switch['int64'] = 'Int64sl'
+            switch['uint64'] = 'Int64ul'
 
         core = names[-1]
 
         if core not in switch:
             # will return a list of resolved names
             type_info = scope.get_type(core)
-            if type(type_info) is type and issubclass(type_info, fields.Field):
+            # if type(type_info) is type: # and not issubclass(type_info, C.Struct):
+            if issubclass(type(type_info), C.Construct) or type(type_info) is type:
                 return type_info
             resolved_names = type_info
             if resolved_names is None:
@@ -2729,7 +2841,7 @@ class PfpInterp(object):
             names += resolved_names
 
         if len(names) >= 2 and names[-1] == names[-2] and names[-1] == "long":
-            res = "Int64"
+            res = "Int64sb"
         else:
             res = switch[names[-1]]
 
@@ -2737,9 +2849,9 @@ class PfpInterp(object):
             names[-1] in ["char", "short", "int", "long"]
             and "unsigned" in names[:-1]
         ):
-            res = "U" + res
+            res = res.replace('sb', 'ub')
 
-        cls = getattr(fields, res)
+        cls = getattr(C, res)
         return cls
 
 def is_forward_declared_struct(node):
@@ -2750,3 +2862,199 @@ def is_forward_declared_struct(node):
         and node.type.decls is None
     )
 
+
+def pprint_construct(c, indent=0):
+    _ind = f'{" " * indent}'
+    if isinstance(c, C.Renamed):
+        print(f'{_ind}{repr(c.name)} / {c.subcon}')
+        pprint_construct(c.subcon, indent + 2)
+
+    elif isinstance(c, C.Struct):
+        [pprint_construct(sc, indent + 2) for sc in c.subcons]
+
+    elif isinstance(c, C.Array):
+        print(f'{_ind}{c.subcon}[{c.count}]')
+
+    elif isinstance(c, C.IfThenElse):
+        print(f'{_ind}if {c.condfunc} {{')
+        pprint_construct(c.thensubcon, indent + 2)
+        print(f'{_ind}}} else {{')
+        pprint_construct(c.elsesubcon, indent + 2)
+        print(f'{_ind}}}')
+
+    elif isinstance(c, C.Sequence):
+        print(f'{_ind}[')
+        for sc in c.subcons:
+            pprint_construct(sc, indent + 2)
+        print(f'{_ind}]')
+
+    elif isinstance(c, C.Switch):
+        print(f'{_ind}switch {c.keyfunc} {{')
+        for k, v in c.cases.items():
+            print(f'{_ind}case {k}:')
+            pprint_construct(v, indent + 2)
+
+        print(f'{_ind}default:')
+        pprint_construct(c.default, indent + 2)
+        print(f'{_ind}}}')
+
+    elif isinstance(c, C.RepeatUntil):
+        print(f'{_ind}repeatuntil {c.predicate} {{')
+        pprint_construct(c.subcon, indent + 2)
+        print(f'{_ind}}}')
+
+    elif isinstance(c, Loop):
+        print(f'{_ind}loop {c.cond} {{')
+        print(f'{_ind}init:')
+        pprint_construct(c.init, indent + 2)
+        print(f'{_ind}body:')
+        pprint_construct(c.subcon, indent + 2)
+        print(f'{_ind}iter:')
+        pprint_construct(c.iter, indent + 2)
+        print(f'{_ind}}}')
+
+    else:
+        print(f'{_ind}{c}')
+
+    # if hasattr(c, 'subcons'):
+    #     [pprint_construct(sc, indent + 4) for sc in c.subcons]
+
+
+class Endian:
+    LITTLE = '<'
+    BIG = '>'
+    current = LITTLE
+
+    @classmethod
+    def is_LE(self):
+        return Endian.current == Endian.LITTLE
+
+
+class Struct(C.Struct):
+    def _parse(self, stream, context, path):
+        obj = C.Container()
+        obj._io = stream
+        context = C.Container(_ = context,
+                              _params = context._params,
+                              _root = None,
+                              _parsing = context._parsing,
+                              _building = context._building,
+                              _sizing = context._sizing,
+                              _subcons = self._subcons,
+                              _io = stream,
+                              _index = context.get("_index", None),
+                              _obj = obj)  # Adding this param for hoisting
+        context._root = context._.get("_root", context)
+        for sc in self.subcons:
+            try:
+                subobj = sc._parsereport(stream, context, path)
+                if sc.name:
+                    obj[sc.name] = subobj
+                    context[sc.name] = subobj
+            except C.StopFieldError:
+                break
+        return obj
+
+
+class Hoisted(C.Renamed):
+    def _parse(self, stream, context, path):
+        res = super()._parse(stream, context, path)
+
+        # For computed values, just overwrite the var
+        if isinstance(self.subcon, C.Computed):
+            context._obj[self.name] = res
+
+        # For repeated declarations, do the 010-style implicit arrays
+        else:
+            # Already declared, create the list or append to it
+            if self.name in context._obj:
+                if isinstance(context._obj[self.name], C.ListContainer):
+                    context._obj[self.name].append(res)
+                else:
+                    context._obj[self.name] = C.ListContainer([context._obj[self.name], res])
+
+            # not declared yet, just place the var in
+            else:
+                context._obj[self.name] = res
+
+        return res
+
+
+class CompoundContinue(C.ConstructError):
+    pass
+
+
+class CompoundBreak(C.ConstructError):
+    pass
+
+class Compound(C.Sequence):
+    def __init__(self, *subcons, **subconskw):
+        super().__init__(*subcons, **subconskw)
+
+    def _parse(self, stream, context, path):
+        obj = C.ListContainer()
+        # context = Container(_ = context, _params = context._params, _root = None, _parsing = context._parsing, _building = context._building, _sizing = context._sizing, _subcons = self._subcons, _io = stream, _index = context.get("_index", None))
+        # context._root = context._.get("_root", context)
+        for sc in self.subcons:
+            try:
+                subobj = sc._parsereport(stream, context, path)
+                obj.append(subobj)
+                if sc.name:
+                    context[sc.name] = subobj
+            except C.StopFieldError:
+                break
+        return obj
+
+class BreakableCompound(Compound):
+    def _parse(self, stream, context, path):
+        try:
+            return super()._parse(stream, context, path)
+        except CompoundBreak:
+            pass
+
+
+class Loop(C.Subconstruct):
+    def __init__(self, cond, init: Compound = None, body: Compound = None, iter_: Compound = None):
+        super().__init__(body)
+        self.cond = cond
+        self.init = init
+        self.iter = iter_
+
+    def _parse(self, stream, context, path):
+        # Initialize any loop vars
+        if self.init:
+            self.init._parsereport(stream, context, path)
+
+        for i in itertools.count():
+            context._index = i
+
+            # Stop when the condition is false
+            if self.cond is not None and not self.cond(context):
+                break
+
+            # Run the loop body
+            try:
+                if self.subcon:
+                    self.subcon._parsereport(stream, context, path)
+            except CompoundBreak:
+                return
+            except CompoundContinue:
+                continue
+            finally:
+                # Run the iteration step regardless
+                if self.iter:
+                    self.iter._parsereport(stream, context, path)
+
+
+@C.singleton
+class Break(C.Pass.__class__):
+    def _parse(self, *_):
+        raise CompoundBreak
+
+@C.singleton
+class Continue(C.Pass.__class__):
+    def _parse(self, *_):
+        raise CompoundContinue
+
+def get_this_name(path: C.Path):
+    return path._Path__field

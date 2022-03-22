@@ -6,13 +6,14 @@ import zlib
 import six
 
 from pfp.native import native
-import pfp.fields
+# import pfp.fields
 from pfp.dbg import PfpDbg
 import pfp.utils as utils
 import pfp.errors as errors
+import construct as C
 
 
-@native(name="WatchLength", ret=pfp.fields.Void)
+@native(name="WatchLength", ret=C.Pass)
 def watch_length(params, ctxt, scope, stream, coord):
     """WatchLength - Watch the total length of each of the params.
     
@@ -37,7 +38,7 @@ def watch_length(params, ctxt, scope, stream, coord):
     to_update._pfp__set_value(total_size)
 
 
-@native(name="WatchCrc32", ret=pfp.fields.Void)
+@native(name="WatchCrc32", ret=C.Pass)
 def watch_crc(params, ctxt, scope, stream, coord):
     """WatchCrc32 - Watch the total crc32 of the params.
     

@@ -10,7 +10,7 @@ import six
 
 
 import pfp.fuzz as fuzz
-import pfp.fields as fields
+# import pfp.fields as fields
 import pfp.utils as utils
 
 

@@ -3,7 +3,7 @@ import six
 import pfp.bitwrap as bitwrap
 import pfp.errors as errors
 import pfp.utils as utils
-import pfp.fields
+# import pfp.fields
 
 
 class BaseFunction(object):
@@ -88,8 +88,9 @@ class NativeFunction(BaseFunction):
             # return value matches what is declared as the return type?
             res_field = res
         else:
-            res_field = self.ret()
-            res_field._pfp__set_value(res)
+            # res_field = self.ret.parse(res)
+            # res_field._pfp__set_value(res)
+            res_field = res
 
         return res_field
 
