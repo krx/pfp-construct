@@ -6,6 +6,9 @@
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/d0c_s4vage?style=plastic)](https://twitter.com/d0c_s4vage)
 
+# !! WIP !!
+## This is a fork of `pfp` that uses [construct](https://github.com/construct/construct) internally instead of custom classes
+
 # pfp
 
 `pfp` is a python-based interpreter for 010 template scripts.
