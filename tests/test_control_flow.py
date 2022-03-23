@@ -8,8 +8,6 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pfp
-import pfp.fields
-from pfp.fields import PYVAL, PYSTR
 import pfp.interp
 import pfp.utils
 
@@ -213,11 +211,11 @@ class TestControlFlow(utils.PfpTestCase):
                 } while(0);
             """,
         )
-        self.assertEqual(dom.str, b"abcd")
-        self.assertEqual(dom.str[0], ord("a"))
-        self.assertEqual(dom.str[1], ord("b"))
-        self.assertEqual(dom.str[2], ord("c"))
-        self.assertEqual(dom.str[3], ord("d"))
+        self.assertEqual(dom.str, "abcd")
+        self.assertEqual(dom.str[0], "a")
+        self.assertEqual(dom.str[1], "b")
+        self.assertEqual(dom.str[2], "c")
+        self.assertEqual(dom.str[3], "d")
 
     def test_switch(self):
         dom = self._test_parse_build(
@@ -247,8 +245,8 @@ class TestControlFlow(utils.PfpTestCase):
             "\x00\x01\x00\x02\x00\x03",
             """
             BigEndian();
-            local int a = 1;
-            switch(a) {
+            local int x = 1;
+            switch(x) {
                 case 0:
                 case 1:
                 case 2:
@@ -333,9 +331,14 @@ class TestControlFlow(utils.PfpTestCase):
                 c = d = b;
             """,
         )
-        self.assertEqual(dom.b is dom.c, False)
-        self.assertEqual(dom.b is dom.d, False)
-        self.assertEqual(dom.c is dom.d, False)
+        # literally always true with ints :shrug:
+        # self.assertEqual(dom.b is dom.c, False)
+        # self.assertEqual(dom.b is dom.d, False)
+        # self.assertEqual(dom.c is dom.d, False)
+
+        self.assertEqual(dom.b, 10)
+        self.assertEqual(dom.c, 10)
+        self.assertEqual(dom.d, 10)
 
 
 if __name__ == "__main__":

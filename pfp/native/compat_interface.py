@@ -9,6 +9,8 @@ are nops, some are fully implemented.
 
 import sys
 
+from matplotlib.style import context
+
 from pfp.native import native, predefine
 # import pfp.fields
 import pfp.errors as errors
@@ -632,7 +634,7 @@ def PasteFromClipboard(params, ctxt, scope, stream, coord):
 
 
 # int Printf( const char format[] [, argument, ... ] )
-@native(name="Printf", ret=C.Int, send_interp=True)
+@native(name="Printf", ret=int, send_interp=True)
 def Printf(params, ctxt, scope, stream, coord, interp):
     """Prints format string to stdout
 
@@ -647,14 +649,13 @@ def Printf(params, ctxt, scope, stream, coord, interp):
 
     parts = []
     for part in params[1:]:
-        if isinstance(part, pfp.fields.Array) or isinstance(
-            part, C.CString
-        ):
-            parts.append(PYSTR(part))
-        else:
-            parts.append(PYVAL(part))
+        # This value may be nested down a bunch of lambda statements,
+        # so keep calling it until we get a value
+        while callable(part):
+            part = part(ctxt)
+        parts.append(part)
 
-    to_print = PYSTR(params[0]) % tuple(parts)
+    to_print = str(params[0]) % tuple(parts)
     res = len(to_print)
 
     if interp._printf:
@@ -880,6 +881,6 @@ def Warning(params, ctxt, scope, stream, coord):
 
 
 # void Assert( int value, const char msg[] = "" )
-@native(name="Assert", ret=C.Pass)
+@native(name="Assert", ret=None)
 def Assert(params, ctxt, scope, stream, coord):
     pass

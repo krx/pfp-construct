@@ -8,7 +8,6 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pfp
-import pfp.fields
 import pfp.interp
 import pfp.utils
 
@@ -17,7 +16,7 @@ import utils
 
 class TestBasic(utils.PfpTestCase):
     def setUp(self):
-        pfp.fields.NumberBase.endian = pfp.fields.LITTLE_ENDIAN
+        pfp.interp.Endian.current = pfp.interp.Endian.LITTLE
 
     def tearDown(self):
         pass
@@ -549,7 +548,7 @@ class TestBasic(utils.PfpTestCase):
                 }
 
                 void Func1() {
-                    
+
                 }
 
                 if(function_exists(Func1)) {

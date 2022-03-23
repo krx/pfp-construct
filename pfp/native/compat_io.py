@@ -20,7 +20,7 @@ import construct as C
 # http://www.sweetscape.com/010editor/manual/FuncIO.htm
 
 # void BigEndian()
-@native(name="BigEndian", ret=C.Pass)
+@native(name="BigEndian", ret=None)
 def BigEndian(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
@@ -106,7 +106,7 @@ def DirectoryExists(params, ctxt, scope, stream, coord):
 
 
 # int FEof()
-@native(name="FEof", ret=C.Int)
+@native(name="FEof", ret=bool)
 def FEof(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
@@ -115,10 +115,7 @@ def FEof(params, ctxt, scope, stream, coord):
 
     # now that streams are _ALL_ BitwrappedStreams, we can use BitwrappedStream-specific
     # functions
-    if stream.is_eof():
-        return 1
-    else:
-        return 0
+    return C.stream_iseof(ctxt._io)
 
 
 # int64 FileSize()
@@ -213,13 +210,14 @@ def FSkip(params, ctxt, scope, stream, coord):
 
 
 # int64 FTell()
-@native(name="FTell", ret=C.Long)
+@native(name="FTell", ret=int)
 def FTell(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
             coord, "0 arguments", "{} args".format(len(params))
         )
-    return C.Tell()
+    # print()
+    return C.stream_tell(ctxt._io, None)
 
 
 # void InsertBytes( int64 start, int64 size, uchar value=0 )
@@ -229,33 +227,27 @@ def InsertBytes(params, ctxt, scope, stream, coord):
 
 
 # int IsBigEndian()
-@native(name="IsBigEndian", ret=C.Int)
+@native(name="IsBigEndian", ret=bool)
 def IsBigEndian(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
             coord, "0 arguments", "{} args".format(len(params))
         )
-    if pfp.interp.Endian.current == pfp.interp.Endian.BIG:
-        return 1
-    else:
-        return 0
+    return pfp.interp.Endian.current == pfp.interp.Endian.BIG
 
 
 # int IsLittleEndian()
-@native(name="IsLittleEndian", ret=C.Int)
+@native(name="IsLittleEndian", ret=bool)
 def IsLittleEndian(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
             coord, "0 arguments", "{} args".format(len(params))
         )
-    if pfp.interp.Endian.current == pfp.interp.Endian.LITTLE:
-        return 0
-    else:
-        return 1
+    return pfp.interp.Endian.current == pfp.interp.Endian.LITTLE
 
 
 # void LittleEndian()
-@native(name="LittleEndian", ret=C.Pass)
+@native(name="LittleEndian", ret=None)
 def LittleEndian(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
@@ -352,9 +344,9 @@ def ReadUByte(params, ctxt, scope, stream, coord):
 
 
 # uint ReadUInt( int64 pos=FTell() )
-@native(name="ReadUInt", ret=C.Int32ub)
+@native(name="ReadUInt", ret=int)
 def ReadUInt(params, ctxt, scope, stream, coord):
-    return C.Peek(C.Int32ul if pfp.interp.Endian.is_LE() else C.Int32ub)
+    return C.Peek(C.Int32ul if pfp.interp.Endian.is_LE() else C.Int32ub).parse_stream(ctxt._io)
     # return _read_data(params, stream, pfp.fields.UInt, coord)
 
 

@@ -824,7 +824,7 @@ class PfpInterp(object):
             AST.EmptyStatement: self._handle_empty_statement,
             AST.DoWhile: self._handle_do_while,
             AST.StructCallTypeDecl: self._handle_struct_call_type_decl,
-            AST.TernaryOp: self._handle_if,
+            AST.TernaryOp: self._handle_ternary,
             StructDecls: self._handle_struct_decls,
             UnionDecls: self._handle_union_decls,
         }
@@ -1064,7 +1064,7 @@ class PfpInterp(object):
         #                IdentifierType: ['char']
 
         self._dlog("interpreting template")
-        self._ast.show()
+        # self._ast.show()
 
         try:
             # it is important to pass the stream in as the stream
@@ -1213,6 +1213,7 @@ class PfpInterp(object):
             if not isinstance(child, (AST.FuncDef, AST.Typedef)) \
                     and not  is_forward_declared_struct(child):
                 continue
+            child._add_to_ctxt = True
             self._handle_node(child, scope, ctxt, stream)
             scope.clear_meta()
 
@@ -1222,9 +1223,13 @@ class PfpInterp(object):
             if isinstance(child, (AST.FuncDef, AST.Typedef)) or \
                     is_forward_declared_struct(child):
                 continue
-            self._handle_node(child, scope, ctxt, stream)
+            child._add_to_ctxt = True
+            res = self._handle_node(child, scope, ctxt, stream)
 
-        pprint_construct(ctxt)
+            # if isinstance(child, AST.FuncCall):
+            #     ctxt.subcons.append(res)
+
+        # pprint_construct(ctxt)
         # ctxt._pfp__process_fields_metadata()
 
         return ctxt.parse_stream(stream)
@@ -1321,8 +1326,8 @@ class PfpInterp(object):
 
         if getattr(node, "bitsize", None) is not None:
             bitsize = self._handle_node(node.bitsize, scope, ctxt, stream)
-            node.show()
-            print(bitsize, field, field_name)
+            # node.show()
+            # print(bitsize, field, field_name)
             # has_prev = len(ctxt._pfp__children) > 0
 
             # bitfield_rw = None
@@ -1381,6 +1386,11 @@ class PfpInterp(object):
                     # field._pfp__set_value(val)
                     field = val
                 self._add_child(ctxt, field_name, field, stream)
+            elif isinstance(field, C.FormatField):
+                self._add_child(ctxt, field_name, C.Computed(0), stream)
+            else:
+                self._add_child(ctxt, field_name, C.Pass, stream)
+
 
             # if "const" in node.quals:
             #     field._pfp__freeze()
@@ -1495,8 +1505,11 @@ class PfpInterp(object):
 
         return field
 
+    def _check_add_child(self, node):
+        return hasattr(node, '_add_to_ctxt') and node._add_to_ctxt
+
     def _add_child(self, ctxt: C.Construct, field_name: str, field, stream):
-        print(ctxt.subcons, field, field_name)
+        # print(ctxt.subcons, field, field_name)
         for i, sc in enumerate(ctxt.subcons):
             if sc.name == field_name:
                 if isinstance(sc.subcon, C.Array):
@@ -1513,7 +1526,7 @@ class PfpInterp(object):
                 break
         else:
             # First time this name has shown up
-            print(field, field_name)
+            # print(field, field_name)
             sc = Hoisted(field, newname=field_name)
             ctxt.subcons.append(sc)
             # ctxt.subcons.append(C.Probe())
@@ -1944,12 +1957,12 @@ class PfpInterp(object):
             "%": lambda x, y: x % y,
             ">": lambda x, y: x > y,
             "<": lambda x, y: x < y,
-            "||": lambda x, y: 1 if x or y else 0,
+            "||": lambda x, y: x or y,
             ">=": lambda x, y: x >= y,
             "<=": lambda x, y: x <= y,
             "==": lambda x, y: x == y,
             "!=": lambda x, y: x != y,
-            "&&": lambda x, y: 1 if x and y else 0,
+            "&&": lambda x, y: x and y,
             ">>": lambda x, y: x >> y,
             "<<": lambda x, y: x << y,
         }
@@ -1975,7 +1988,14 @@ class PfpInterp(object):
             if node.op not in switch:
                 raise errors.UnsupportedBinaryOperator(node.coord, node.op)
 
+            # This happens with C.Path, the binary expression is automatically built
+            # print(node.op, left_val, right_val)
+            # if callable(left_val) or callable(right_val):
             res = switch[node.op](left_val, right_val)
+            # else:
+            #     left_val = left_val.func if isinstance(left_val, Statement) else lambda _: left_val
+            #     right_val = right_val.func if isinstance(right_val, Statement) else lambda _: right_val
+            #     res = (lambda ctxt: switch[node.op](left_val(ctxt), right_val(ctxt)))
 
         if type(res) is bool:
             if res:
@@ -1998,63 +2018,108 @@ class PfpInterp(object):
         """
         self._dlog("handling unary op {}".format(node.op))
 
-        special_switch = {
+        switch_ctxt = {
+            # for ++i and --i
+            "p++": self._handle_post_plus_plus,
+            "p--": self._handle_post_minus_minus,
+            "++": self._handle_pre_plus_plus,
+            "--": self._handle_pre_minus_minus,
             "parentof": self._handle_parentof,
             "exists": self._handle_exists,
             "function_exists": self._handle_function_exists,
-            "p++": self._handle_post_plus_plus,
-            "p--": self._handle_post_minus_minus,
+            "startof": self._get_startof,
         }
 
         switch = {
-            # for ++i and --i
-            "++": lambda x, v: x.__iadd__(1),
-            "--": lambda x, v: x.__isub__(1),
-            "~": lambda x, v: ~x,
-            "!": lambda x, v: not x,
-            "-": lambda x, v: -x,
-            "sizeof": lambda x, v: (fields.UInt64() + x._pfp__width()),
-            "startof": lambda x, v: (fields.UInt64() + x._pfp__offset),
+            "~": lambda x: ~x,
+            "!": lambda x: not x,
+            "-": lambda x: -x,
         }
 
-        if node.op not in switch and node.op not in special_switch:
+        switch_preparse = {
+            'sizeof': self._compute_sizeof,
+        }
+
+        if node.op not in switch \
+            and node.op not in switch_ctxt \
+            and node.op not in switch_preparse:
             raise errors.UnsupportedUnaryOperator(node.coord, node.op)
 
-        if node.op in special_switch:
-            field, res = special_switch[node.op](node, scope, ctxt, stream)
+        field = self._handle_node(node.expr, scope, ctxt, stream)
+        if node.op in switch_ctxt:
+            res = StatementWithContext(switch_ctxt[node.op], field)
+        elif node.op in switch_preparse:
+            res = switch_preparse[node.op](field, ctxt)
         else:
-            field = self._handle_node(node.expr, scope, ctxt, stream)
-            if type(field) is type:
-                field = field()
-            res = switch[node.op](field, 1)
-            if type(res) is bool:
-                # new_res = field.__class__()
-                # new_res._pfp__set_value(1 if res == True else 0)
-                res = res
-        ctxt.subcons.append(res)
-        return field
+            res = Statement(switch[node.op], field)
 
-    def _handle_post_plus_plus(self, node, scope, ctxt, stream):
-        field = self._handle_node(node.expr, scope, ctxt, stream)
-        name = get_this_name(field)
+        if self._check_add_child(node):
+            ctxt.subcons.append(res)
 
-        def _pp(_, ctx):
-            ctx[name] += 1
-            ctx._obj[name] += 1
+        return res
 
-        return field, C.Pass * _pp
+    def _compute_sizeof(self, field, ctxt):
+        # sizeof has to be calculated pre-parsing so we can use the struct info
+        if isinstance(field, C.Construct):
+            # Already a construct, just get the size
+            return field.sizeof()
 
-    def _handle_post_minus_minus(self, node, scope, ctxt, stream):
-        field = self._handle_node(node.expr, scope, ctxt, stream)
-        name = get_this_name(field)
+        elif isinstance(field, C.Path):
+            # Resolve this manually to a construct
+            # We can't do field(ctxt) because ctxt is a Struct, not Container
+            # effectively doing the same thing though
 
-        def _mm(_, ctx):
-            ctx[name] -= 1
-            ctx._obj[name] -= 1
+            # Gather the field names going up to the root
+            names = []
+            while isinstance(field, C.Path):
+                if field._Path__field:
+                    names.append(field._Path__field)
+                field = field._Path__parent
 
-        return field, C.Pass * _mm
+            # The root will be None
+            if field is None:
+                field = ctxt
 
-    def _handle_parentof(self, node, scope, ctxt, stream):
+            # Walk down the names to find the construct
+            con = field
+            for name in names:
+                for sc in con.subcons:
+                    if sc.name == name:
+                        con = sc
+                        break
+
+            # Finally get the size
+            return con.sizeof()
+
+    def _get_startof(self, val, field, ctxt):
+        return ctxt._starts[get_this_name(field)]
+
+    def _update_ctxt(self, ctxt, name, val):
+        val = val(ctxt) if callable(val) else val
+        # Change both contexts to make sure the value propagates to the final container
+        ctxt[name] = val
+        ctxt._obj[name] = val
+        return ctxt._obj[name]
+
+    def _handle_pre_plus_plus(self, val, field, ctxt):
+        val += 1
+        self._update_ctxt(ctxt, get_this_name(field), val)
+        return val
+
+    def _handle_pre_minus_minus(self, val, field, ctxt):
+        val -= 1
+        self._update_ctxt(ctxt, get_this_name(field), val)
+        return val
+
+    def _handle_post_plus_plus(self, val, field, ctxt):
+        self._update_ctxt(ctxt, get_this_name(field), val + 1)
+        return val
+
+    def _handle_post_minus_minus(self, val, field, ctxt):
+        self._update_ctxt(ctxt, get_this_name(field), val - 1)
+        return val
+
+    def _handle_parentof(self, val, field, ctxt):
         """Handle the parentof unary operator
 
         :node: TODO
@@ -2074,10 +2139,18 @@ class PfpInterp(object):
         # the proper way would be to do (parentof(a.b.c)).a or
         # (parentof a.b.c).a
 
-        field = self._handle_node(node.expr, scope, ctxt, stream)
+        # Get out of any nested calls to a Path
+        while not isinstance(field, C.Path):
+            field = field(ctxt)
+
+        # Rather than descend to a (possibly final) value, just directly use the parent
+        # to keep everything as a Path
+        if field._Path__parent is not None:
+            return field._Path__parent
+
         return field._
 
-    def _handle_exists(self, node, scope, ctxt, stream):
+    def _handle_exists(self, val, field, ctxt):
         """Handle the exists unary operator
 
         :node: TODO
@@ -2087,15 +2160,13 @@ class PfpInterp(object):
         :returns: TODO
 
         """
-        res = fields.Int()
         try:
-            self._handle_node(node.expr, scope, ctxt, stream)
-            res._pfp__set_value(1)
-        except AttributeError:
-            res._pfp__set_value(0)
-        return res
+            field(ctxt)  # This will resolve if the field exists
+            return True
+        except KeyError:
+            return False
 
-    def _handle_function_exists(self, node, scope, ctxt, stream):
+    def _handle_function_exists(self, val, field, ctxt):
         """Handle the function_exists unary operator
 
         :node: TODO
@@ -2105,16 +2176,7 @@ class PfpInterp(object):
         :returns: TODO
 
         """
-        res = fields.Int()
-        try:
-            func = self._handle_node(node.expr, scope, ctxt, stream)
-            if isinstance(func, functions.BaseFunction):
-                res._pfp__set_value(1)
-            else:
-                res._pfp__set_value(0)
-        except errors.UnresolvedID:
-            res._pfp__set_value(0)
-        return res
+        return isinstance(val, functions.BaseFunction)
 
     def _handle_id(self, node, scope, ctxt, stream):
         """Handle an ID node (return a field object for the ID)
@@ -2156,43 +2218,39 @@ class PfpInterp(object):
         :returns: TODO
         """
 
-        def add_op(x, y):
-            x += y
 
-        def sub_op(x, y):
-            x -= y
+        def add_op(rval, lval, field, ctxt):
+            return self._update_ctxt(ctxt, get_this_name(field), lval + rval)
 
-        def div_op(x, y):
-            x.__idiv__(y)
+        def sub_op(rval, lval, field, ctxt):
+            return self._update_ctxt(ctxt, get_this_name(field), lval - rval)
 
-        def mod_op(x, y):
-            x %= y
+        def div_op(rval, lval, field, ctxt):
+            return self._update_ctxt(ctxt, get_this_name(field), lval // rval)
 
-        def mul_op(x, y):
-            x *= y
+        def mod_op(rval, lval, field, ctxt):
+            return self._update_ctxt(ctxt, get_this_name(field), lval % rval)
 
-        def xor_op(x, y):
-            x ^= y
+        def mul_op(rval, lval, field, ctxt):
+            return self._update_ctxt(ctxt, get_this_name(field), lval * rval)
 
-        def and_op(x, y):
-            x &= y
+        def xor_op(rval, lval, field, ctxt):
+            return self._update_ctxt(ctxt, get_this_name(field), lval ^ rval)
 
-        def or_op(x, y):
-            x |= y
+        def and_op(rval, lval, field, ctxt):
+            return self._update_ctxt(ctxt, get_this_name(field), lval & rval)
 
-        def lshift_op(x, y):
-            x <<= y
+        def or_op(rval, lval, field, ctxt):
+            return self._update_ctxt(ctxt, get_this_name(field), lval | rval)
 
-        def rshift_op(x, y):
-            x >>= y
+        def lshift_op(rval, lval, field, ctxt):
+            return self._update_ctxt(ctxt, get_this_name(field), lval << rval)
 
-        def assign_op(x, y):
-            name = x._Path__field
-            def _func(obj, ctx):
-                # Have to update both the actual container and the context
-                ctx[name] = y
-                ctx._obj[name] = y
-            return C.Pass * _func
+        def rshift_op(rval, lval, field, ctxt):
+            return self._update_ctxt(ctxt, get_this_name(field), lval >> rval)
+
+        def assign_op(rval, lval, field, ctxt):
+            return self._update_ctxt(ctxt, get_this_name(field), rval)
 
         switch = {
             "+=": add_op,
@@ -2230,9 +2288,11 @@ class PfpInterp(object):
             self._dlog("value {}= {}".format(node.op, value))
             if node.op not in switch:
                 raise errors.UnsupportedAssignmentOperator(node.coord, node.op)
-            field = switch[node.op](field, value)
+            # field = switch[node.op](field, value)
+            field = StatementWithContext(lambda *args: switch[node.op](value, *args), field)
 
-        ctxt.subcons.append(field)  # Add the Pass+function to the struct
+        if self._check_add_child(node):
+            ctxt.subcons.append(field)
         return field
 
     def _handle_func_def(self, node, scope, ctxt, stream):
@@ -2315,7 +2375,10 @@ class PfpInterp(object):
         else:
             func_args = self._handle_node(node.args, scope, ctxt, stream)
         func = self._handle_node(node.name, scope, ctxt, stream)
-        return func.call(func_args, ctxt, scope, stream, self, node.coord)
+        # res = Statement(lambda ctxt: func.call(func_args, ctxt, scope, stream, self, node.coord))
+        res = Statement(lambda ctxt: func.call(func_args, ctxt, scope, stream, self, node.coord), C.this)
+        ctxt.subcons.append(res)  # TODO do this somewhere else
+        return res
 
     def _handle_expr_list(self, node, scope, ctxt, stream):
         """Handle ExprList nodes
@@ -2346,25 +2409,26 @@ class PfpInterp(object):
         self._dlog("handling compound statement")
         # scope.push()
 
-        try:
-            # if isinstance(ctxt, Compound):
-            #     seq = ctxt
-            # else:
-            seq = Compound()
+        # if isinstance(ctxt, Compound):
+        #     seq = ctxt
+        # else:
+        seq = Compound()
 
-            for child in node.children():
-                scope.clear_meta()
-                self._handle_node(child, scope, seq, stream)
+        for child in node.children():
+            scope.clear_meta()
 
-            # if isinstance(ctxt, Compound):
-                # ctxt.subcons.append(seq)
-            return seq
+            if type(child) is tuple:
+                child = child[1]
+            child._add_to_ctxt = True
+
+            self._handle_node(child, scope, seq, stream)
+
+        # if isinstance(ctxt, Compound):
+            # ctxt.subcons.append(seq)
+        return seq
 
         # in case a return occurs, be sure to pop the scope
         # (returns are implemented by raising an exception)
-        finally:
-            # scope.pop()
-            pass
 
     def _handle_return(self, node, scope, ctxt, stream):
         """Handle Return nodes
@@ -2487,21 +2551,36 @@ class PfpInterp(object):
         :returns: TODO
 
         """
-        self._dlog("handling if/ternary_op")
+        self._dlog("handling if")
         cond = self._handle_node(node.cond, scope, ctxt, stream)
-        then = self._handle_node(node.iftrue, scope, ctxt, stream)
+
+        then_ctxt = Compound()
+        then = self._handle_node(node.iftrue, scope, then_ctxt, stream)
+        then = then if isinstance(then, C.Construct) else C.Computed(then)
 
         # Use IfThenElse if there's an else block
         if node.iffalse is not None:
-            stmt = C.IfThenElse(
-                cond,
-                then,
-                self._handle_node(node.iffalse, scope, ctxt, stream)
-            )
+            else_ctxt = Compound()
+            else_ = self._handle_node(node.iffalse, scope, else_ctxt, stream)
+            else_ = else_ if isinstance(else_, C.Construct) else C.Computed(else_)
+
+            stmt = C.IfThenElse(cond, then, else_)
         else:
             # Just a regular if
-             stmt = C.If(cond, then)
-        ctxt.subcons.append(stmt)
+            stmt = C.If(cond, then)
+
+        if self._check_add_child(node):
+            ctxt.subcons.append(stmt)
+        return stmt
+
+    def _handle_ternary(self, node, scope, ctxt, stream):
+        self._dlog("handling ternary")
+
+        cond = self._handle_node(node.cond, scope, ctxt, stream)
+        then = self._handle_node(node.iftrue, scope, ctxt, stream)
+        else_ = self._handle_node(node.iffalse, scope, ctxt, stream)
+
+        return StatementWithContext(lambda _1, _2, context: then if cond(context) else else_, None)
 
     def _handle_for(self, node, scope, ctxt, stream):
         """Handle For nodes
@@ -2530,7 +2609,8 @@ class PfpInterp(object):
 
         if node.next is not None:
             # do the next statement
-            self._handle_node(node.next, scope, iter_, stream)
+            node.next.show()
+            iter_.subcons.append(self._handle_node(node.next, scope, iter_, stream))
 
         ctxt.subcons.append(Loop(cond, init, body, iter_))
 
@@ -2815,11 +2895,11 @@ class PfpInterp(object):
             "wstring": "CString",
         }
 
-        if Endian.is_LE():
-            switch['int'] = 'Int32sl'
-            switch['long'] = 'Int32sl'
-            switch['int64'] = 'Int64sl'
-            switch['uint64'] = 'Int64ul'
+        # if Endian.is_LE():
+        #     switch['int'] = 'Int32sl'
+        #     switch['long'] = 'Int32sl'
+        #     switch['int64'] = 'Int64sl'
+        #     switch['uint64'] = 'Int64ul'
 
         core = names[-1]
 
@@ -2852,6 +2932,12 @@ class PfpInterp(object):
             res = res.replace('sb', 'ub')
 
         cls = getattr(C, res)
+
+        if names[-1] == 'string':
+            cls = cls('ascii')
+        elif names[-1] == 'wstring':
+            cls = cls('utf16')
+
         return cls
 
 def is_forward_declared_struct(node):
@@ -2943,7 +3029,8 @@ class Struct(C.Struct):
                               _subcons = self._subcons,
                               _io = stream,
                               _index = context.get("_index", None),
-                              _obj = obj)  # Adding this param for hoisting
+                              _obj = obj,  # Adding this param for hoisting
+                              _starts = {})  # Adding this for startof tracking
         context._root = context._.get("_root", context)
         for sc in self.subcons:
             try:
@@ -2955,10 +3042,38 @@ class Struct(C.Struct):
                 break
         return obj
 
+    # def __getitem__(self, name):
+    #     print('aaaaaaaaaaaaaaaaaaaaaaa')
+    #     if isinstance(name, str):
+    #         # Special case when resolving a Path
+    #         for sc in self.subcons:
+    #             if sc.name == name:
+    #                 return sc
+
+        # Default to the normal count stuff otherwise
+        return super().__getitem__(name)
 
 class Hoisted(C.Renamed):
+    """
+    Wrapper around Renamed that lifts defined variables to the nearest Struct
+    This allows us to define things inside an IfThenElse for example
+    """
     def _parse(self, stream, context, path):
+        # Save off the starting offset
+        start_off = C.stream_tell(stream, path)
+        if self.name not in context._starts:
+            context._starts[self.name] = start_off
+
+        # Update endianness on the fly
+        if isinstance(self.subcon, C.FormatField):
+            fmt = self.subcon.fmtstr[1:]
+            self.subcon.fmtstr = Endian.current + fmt
+
         res = super()._parse(stream, context, path)
+
+        # Execute the res if it's a construct
+        if isinstance(res, Statement):
+            res = res._parsereport(stream, context, path)
 
         # For computed values, just overwrite the var
         if isinstance(self.subcon, C.Computed):
@@ -3029,7 +3144,8 @@ class Loop(C.Subconstruct):
             context._index = i
 
             # Stop when the condition is false
-            if self.cond is not None and not self.cond(context):
+            cond = self.cond(context) if callable(self.cond) else self.cond
+            if cond is not None and not cond:
                 break
 
             # Run the loop body
@@ -3045,6 +3161,39 @@ class Loop(C.Subconstruct):
                 if self.iter:
                     self.iter._parsereport(stream, context, path)
 
+class Statement(C.FuncPath):
+    def __init__(self, func, operand):
+        super().__init__(func, operand)
+        self.name = self.parsed = None
+
+    def _parsereport(self, stream, context, path):
+        obj = self._parse(stream, context, path)
+        if self.parsed is not None:
+            self.parsed(obj, context)
+        return obj
+
+    def _parse(self, stream, context, path):
+        return self(context)
+
+    # def __getattr__(self, name):
+    #     return Statement(lambda op: self._FuncPath__func(op)[name], self._FuncPath__operands)
+
+    def __getitem__(self, name):
+        return Statement(lambda *args: self._FuncPath__func(*args)[name], self._FuncPath__operand)
+
+class StatementWithContext(Statement):
+    def __call__(self, operand, *args):
+        # The operand here is the context during parsing
+        try:
+            # This might not be a defined var yet, just use None for the value if that happens
+            op = self._FuncPath__operand(operand) if callable(self._FuncPath__operand) else self._FuncPath__operand
+        except KeyError:
+            op = None
+
+        return self._FuncPath__func(*(op, self._FuncPath__operand, operand))
+
+    def __getitem__(self, name):
+        return StatementWithContext(lambda *args: self._FuncPath__func(*args)[name], self._FuncPath__operand)
 
 @C.singleton
 class Break(C.Pass.__class__):
