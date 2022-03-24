@@ -8,7 +8,6 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pfp
-import pfp.fields
 import pfp.interp
 import pfp.utils
 
@@ -98,7 +97,7 @@ class TestStructUnion(utils.PfpTestCase):
         )
         assert dom.s.magic == "\x00\x01\x02\x03"
         assert dom.s.filesize == 0x03020100
-    
+
     def test_basic_struct(self):
         dom = self._test_parse_build(
             "\x00\x01\x02\x03",
@@ -144,7 +143,7 @@ class TestStructUnion(utils.PfpTestCase):
         self.assertEqual(dom.root.nested1.nested2.array[1]._pfp__path(), "root.nested1.nested2.array[1]")
         self.assertEqual(dom.root.nested1.nested2.array[2]._pfp__path(), "root.nested1.nested2.array[2]")
         self.assertEqual(dom.root.nested1.nested2.array[3]._pfp__path(), "root.nested1.nested2.array[3]")
-    
+
     def test_struct(self):
         dom = self._test_parse_build(
             "abcddcba",
@@ -157,7 +156,7 @@ class TestStructUnion(utils.PfpTestCase):
                 blah some_struct2;
             """,
         )
-    
+
     def test_forward_declared_struct(self):
         dom = self._test_parse_build(
             "\x00\x01",

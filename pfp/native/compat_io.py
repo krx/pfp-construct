@@ -12,11 +12,12 @@ import six
 import sys
 
 from pfp.native import native
-# import pfp.fields
 import pfp.interp
 import pfp.errors as errors
 import pfp.bitwrap as bitwrap
 import construct as C
+
+from pfp.utils import evaluate
 
 # http://www.sweetscape.com/010editor/manual/FuncIO.htm
 
@@ -120,13 +121,13 @@ def FEof(params, ctxt, scope, stream, coord):
 
 
 # int64 FileSize()
-@native(name="FileSize", ret=C.Long)
+@native(name="FileSize", ret=int)
 def FileSize(params, ctxt, scope, stream, coord):
     if len(params) > 0:
         raise errors.InvalidArguments(
             coord, "0 arguments", "{} args".format(len(params))
         )
-    return stream.size()
+    return ctxt._io.size()
 
 
 # TFileList FindFiles( string dir, string filter )
@@ -276,19 +277,20 @@ def OverwriteBytes(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
-def _read_data(params, stream, cls, coord):
+def _read_data(params, ctxt, cls, coord):
+    stream = ctxt._io
     bits = stream._bits
     curr_pos = stream.tell()
 
     if len(params) == 1:
-        pos = PYVAL(params[0])
+        pos = evaluate(params[0], ctxt)
         stream.seek(pos, 0)
     elif len(params) > 1:
         raise errors.InvalidArguments(
             coord, "at most 1 arguments", "{} args".format(len(params))
         )
 
-    res = cls(stream=stream)
+    res = cls.parse_stream(stream)
 
     # reset the stream
     stream.seek(curr_pos, 0)
@@ -322,9 +324,9 @@ def ReadHFloat(params, ctxt, scope, stream, coord):
 
 
 # int ReadInt( int64 pos=FTell() )
-@native(name="ReadInt", ret=C.Int)
+@native(name="ReadInt", ret=int)
 def ReadInt(params, ctxt, scope, stream, coord):
-    return _read_data(params, stream, C.Int, coord)
+    return _read_data(params, ctxt, C.Int, coord)
 
 
 # int64 ReadInt64( int64 pos=FTell() )
@@ -346,9 +348,9 @@ def ReadShort(params, ctxt, scope, stream, coord):
 
 
 # uchar ReadUByte( int64 pos=FTell() )
-@native(name="ReadUByte", ret=C.Byte)
+@native(name="ReadUByte", ret=int)
 def ReadUByte(params, ctxt, scope, stream, coord):
-    return _read_data(params, stream, pfp.fields.UChar, coord)
+    return _read_data(params, ctxt, C.Byte, coord)
 
 
 # uint ReadUInt( int64 pos=FTell() )
@@ -371,9 +373,9 @@ def ReadUQuad(params, ctxt, scope, stream, coord):
 
 
 # ushort ReadUShort( int64 pos=FTell() )
-@native(name="ReadUShort", ret=C.Int16ub)
+@native(name="ReadUShort", ret=int)
 def ReadUShort(params, ctxt, scope, stream, coord):
-    return _read_data(params, stream, pfp.fields.UShort, coord)
+    return _read_data(params, ctxt, C.Short, coord)
 
 
 # char[] ReadLine( int64 pos, int maxLen=-1, int includeLinefeeds=true )

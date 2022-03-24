@@ -13,7 +13,6 @@ import logging
 import os
 import re
 import struct
-from this import d
 import six
 import sys
 import traceback
@@ -48,19 +47,19 @@ class StructDecls(Decls):
     pass
 
 
-def StructDeclWithParams(scope, struct_cls, struct_args):
-    params = {p.name: val for p, val in zip(struct_cls.args.params, struct_args)}
+# def StructDeclWithParams(scope, struct_cls, struct_args):
+#     params = {p.name: val for p, val in zip(struct_cls.args.params, struct_args)}
 
-    def _struct_func(val, field, context):
-        # Load the params into the local context
-        for k, v in params.items():
-            context[k] = v
+#     def _struct_func(val, field, context):
+#         # Load the params into the local context
+#         for k, v in params.items():
+#             context[k] = v
 
-        # Parse the rest normally
-        # return struct_cls._parsereport(context._io, context, "")
+#         # Parse the rest normally
+#         # return struct_cls._parsereport(context._io, context, "")
 
-    struct_cls.func = StatementWithContext(_struct_func, None)
-    return struct_cls
+#     struct_cls.func = StatementWithContext(_struct_func, None)
+#     return struct_cls
 
 def StructUnionTypeRef(curr_scope, typedef_name, refd_name, interp, node):
     """Create a typedef that resolves itself dynamically. This is needed in
@@ -86,9 +85,9 @@ def StructUnionTypeRef(curr_scope, typedef_name, refd_name, interp, node):
     elif isinstance(node, AST.Union):
         res = Union(0)
 
-
-    # for decl in node.decls:
-    #     interp._handle_node(decl, ctxt=res)
+    if node.decls is not None:
+        for decl in node.decls:
+            interp._handle_node(decl, ctxt=res)
 
     return res
 
@@ -131,9 +130,10 @@ def StructUnionDef(typedef_name, interp, node):
     elif isinstance(node, AST.Union):
         res = Union(0)
 
-    for decl in node.decls:
-        decl._add_to_ctxt = True
-        interp._handle_node(decl, ctxt=res)
+    if node.decls is not None:
+        for decl in node.decls:
+            decl._add_to_ctxt = True
+            interp._handle_node(decl, ctxt=res)
 
     return res
 
@@ -185,12 +185,10 @@ def StructUnionDef(typedef_name, interp, node):
     # )
     # return new_class
 
-    # print(interp._handle_node(decls))
 
 
 def EnumDef(typedef_name, base_cls, enum_vals):
     return C.Enum(base_cls, **enum_vals)
-    # print(enum_vals)
     # new_class = type(
     #     typedef_name,
     #     (fields.Enum,),
@@ -209,7 +207,7 @@ def EnumDef(typedef_name, base_cls, enum_vals):
 def ArrayDecl(item_cls, item_count):
     if item_cls is C.Byte:
         # Special case for byte arrays
-        return C.Bytes(item_count)
+        return Bytes(item_count)
     return C.Array(item_count, item_cls)
     # width = fields.PYVAL(item_count)
 
@@ -1062,7 +1060,6 @@ class PfpInterp(object):
         #                IdentifierType: ['char']
 
         self._dlog("interpreting template")
-        # self._ast.show()
 
         try:
             # it is important to pass the stream in as the stream
@@ -1182,7 +1179,7 @@ class PfpInterp(object):
 
         return res
 
-    def _handle_file_ast(self, node, scope, ctxt, stream):
+    def _handle_file_ast(self, node, scope: Scope, ctxt, stream):
         """TODO: Docstring for _handle_file_ast.
 
         :node: TODO
@@ -1192,7 +1189,6 @@ class PfpInterp(object):
         :returns: TODO
 
         """
-        # node.show()
         self._root = ctxt = '_root' / Struct()
         ctxt._pfp__scope = scope
         # self._root._pfp__name = "__root"
@@ -1240,11 +1236,12 @@ class PfpInterp(object):
         #         continue
             child._add_to_ctxt = True
             res = self._handle_node(child, scope, ctxt, stream)
+            # scope.clear_meta()
 
             # if isinstance(child, AST.FuncCall):
             #     ctxt.subcons.append(res)
 
-        # pprint_construct(ctxt)
+        pprint_construct(ctxt)
         # ctxt._pfp__process_fields_metadata()
         return ctxt.parse_stream(stream)
 
@@ -1322,6 +1319,7 @@ class PfpInterp(object):
 
         """
         self._dlog("handling decl")
+        node
 
         metadata_processor = None
         if node.metadata is not None:
@@ -1341,8 +1339,6 @@ class PfpInterp(object):
 
         if getattr(node, "bitsize", None) is not None:
             bitsize = self._handle_node(node.bitsize, scope, ctxt, stream)
-            # node.show()
-            # print(bitsize, field, field_name)
             # has_prev = len(ctxt._pfp__children) > 0
 
             # bitfield_rw = None
@@ -1407,7 +1403,6 @@ class PfpInterp(object):
             else:
                 self._add_child(ctxt, field_name, C.Pass, stream)
 
-
             # if "const" in node.quals:
             #     field._pfp__freeze()
 
@@ -1426,74 +1421,74 @@ class PfpInterp(object):
             # by this point, structs are already instantiated (they need to be
             # in order to set the new context)
             # if not isinstance(field, fields.Field):
-            if not field.__class__.__module__ == '__builtin__':
-                if issubclass(field.__class__, C.FormatField):
-                    # use the default bitfield direction
-                    if self._bitfield_direction is self.BITFIELD_DIR_DEFAULT:
-                        bitfield_left_right = field.fmtstr[0] == '>'
-                    else:
-                        bitfield_left_right = (
-                            self._bitfield_direction
-                            is self.BITFIELD_DIR_LEFT_RIGHT
-                        )
-
-                    # TODO bitfield shit
-                    if bitsize is not None:
-                        # field = C.Bitwise(C.BitsInteger(bitsize))
-                        field = C.Restreamed(C.BitsInteger(bitsize), C.bytes2bits, 1, C.bits2bytes, 8, lambda n: n//8)
-                    # field = field.parse_stream(stream)
-                    # field = field(
-                    #     stream,
-                    #     bitsize=bitsize,
-                    #     metadata_processor=metadata_processor,
-                    #     bitfield_rw=bitfield_rw,
-                    #     bitfield_padded=self._padded_bitfield,
-                    #     bitfield_left_right=bitfield_left_right,
-                    # )
-
-                # TODO
-                # for now if there's a struct inside of a union that is being
-                # parsed when there's an error, the user will lose information
-                # about how far the parsing got. Here we are explicitly checking for
-                # adding structs and unions to a parent union.
-                elif (
-                    type(field) is type
-                    and (
-                        issubclass(field, C.Struct)
-                        or issubclass(field, C.Union)
-                    )
-                    and not isinstance(ctxt, C.Union)
-                    and hasattr(field, "_pfp__init")
-                ):
-
-                    # this is so that we can have all nested structs added to
-                    # the root DOM, even if there's an error in parsing the data.
-                    # If we didn't do this, any errors parsing the data would cause
-                    # the new struct to not be added to its parent, and the user would
-                    # not be able to see how far the script got
-                    field = field(
-                        stream,
-                        metadata_processor=metadata_processor,
-                        do_init=False,
-                    )
-                    # field._pfp__interp = self
-                    field_res = self._add_child(ctxt, field_name, field, stream)
-
-                    # when adding a new field to a struct/union/fileast, add it to the
-                    # root of the ctxt's scope so that it doesn't get lost by being declared
-                    # from within a function
-                    scope.add_var(field_name, field_res, root=True)
-
-                    field_res._pfp__interp = self
-                    field._pfp__init(stream)
-                    added_child = True
+            # if not field.__class__.__module__ == '__builtin__':
+            if issubclass(field.__class__, C.FormatField):
+                # use the default bitfield direction
+                if self._bitfield_direction is self.BITFIELD_DIR_DEFAULT:
+                    bitfield_left_right = field.fmtstr[0] == '>'
                 else:
-                    pass
-                    # print(field, stream)
-                    # field = field.parse_stream(stream)
-                    # field = field(
-                    #     stream, metadata_processor=metadata_processor
-                    # )
+                    bitfield_left_right = (
+                        self._bitfield_direction
+                        is self.BITFIELD_DIR_LEFT_RIGHT
+                    )
+
+                # TODO bitfield shit
+                if bitsize is not None:
+                    field = BitStreamedInteger(bitsize)
+                    # field = C.Restreamed(C.BitsInteger(bitsize), C.bytes2bits, 1, C.bits2bytes, 8, lambda n: n//8)
+                # field = field.parse_stream(stream)
+                # field = field(
+                #     stream,
+                #     bitsize=bitsize,
+                #     metadata_processor=metadata_processor,
+                #     bitfield_rw=bitfield_rw,
+                #     bitfield_padded=self._padded_bitfield,
+                #     bitfield_left_right=bitfield_left_right,
+                # )
+
+            # TODO
+            # for now if there's a struct inside of a union that is being
+            # parsed when there's an error, the user will lose information
+            # about how far the parsing got. Here we are explicitly checking for
+            # adding structs and unions to a parent union.
+            elif (
+                type(field) is type
+                and (
+                    issubclass(field, C.Struct)
+                    or issubclass(field, C.Union)
+                )
+                and not isinstance(ctxt, C.Union)
+                and hasattr(field, "_pfp__init")
+            ):
+
+                # this is so that we can have all nested structs added to
+                # the root DOM, even if there's an error in parsing the data.
+                # If we didn't do this, any errors parsing the data would cause
+                # the new struct to not be added to its parent, and the user would
+                # not be able to see how far the script got
+                field = field(
+                    stream,
+                    metadata_processor=metadata_processor,
+                    do_init=False,
+                )
+                # field._pfp__interp = self
+                field_res = self._add_child(ctxt, field_name, field, stream)
+
+                # when adding a new field to a struct/union/fileast, add it to the
+                # root of the ctxt's scope so that it doesn't get lost by being declared
+                # from within a function
+                scope.add_var(field_name, field_res, root=True)
+
+                field_res._pfp__interp = self
+                field._pfp__init(stream)
+                added_child = True
+            else:
+                pass
+                # print(field, stream)
+                # field = field.parse_stream(stream)
+                # field = field(
+                #     stream, metadata_processor=metadata_processor
+                # )
 
             if not added_child:
                 # field._pfp__interp = self
@@ -1542,7 +1537,6 @@ class PfpInterp(object):
                 break
         else:
             # First time this name has shown up
-            # print(field, field_name)
             sc = Hoisted(field, newname=field_name)
             ctxt.subcons.append(sc)
             # ctxt.subcons.append(C.Probe())
@@ -1852,7 +1846,7 @@ class PfpInterp(object):
         cls = self._resolve_to_field_class(node.names, scope)
         return cls
 
-    def _handle_typedef(self, node, scope, ctxt, stream):
+    def _handle_typedef(self, node, scope: Scope, ctxt, stream):
         """TODO: Docstring for _handle_typedef.
 
         :node: TODO
@@ -1942,8 +1936,8 @@ class PfpInterp(object):
             # TODO should this be unicode?? will probably bite me later...
             # cut out the quotes
             "string": (
-                lambda x: str(utils.string_escape(x[1:-1])),
-                str,
+                lambda x: str(utils.string_escape(x[1:-1])).encode('utf-8'),
+                bytes,
             ),
         }
 
@@ -2015,7 +2009,6 @@ class PfpInterp(object):
             raise errors.UnsupportedBinaryOperator(node.coord, node.op)
 
         # This happens with C.Path, the binary expression is automatically built
-        # print(node.op, left_val, right_val)
         # if callable(left_val) or callable(right_val):
         res = switch[node.op](left_val, right_val)
         # else:
@@ -2023,12 +2016,12 @@ class PfpInterp(object):
         #     right_val = right_val.func if isinstance(right_val, Statement) else lambda _: right_val
         #     res = (lambda ctxt: switch[node.op](left_val(ctxt), right_val(ctxt)))
 
-        if type(res) is bool:
-            if res:
-                new_res = 1
-            else:
-                new_res = 0
-            res = new_res
+        # if type(res) is bool:
+        #     if res:
+        #         new_res = 1
+        #     else:
+        #         new_res = 0
+        #     res = new_res
 
         return res
 
@@ -2115,13 +2108,14 @@ class PfpInterp(object):
                         break
 
             # Finally get the size
+            pprint_construct(con)
             return con.sizeof()
 
     def _get_startof(self, val, field, ctxt):
         return ctxt._starts[utils.get_field_name(field)]
 
     def _update_ctxt(self, ctxt, name, val):
-        val = val(ctxt) if callable(val) else val
+        val = utils.evaluate(val, ctxt)
         # Change both contexts to make sure the value propagates to the final container
         ctxt[name] = val
         ctxt._obj[name] = val
@@ -2336,7 +2330,6 @@ class PfpInterp(object):
         self._dlog("handling function definition")
         func = self._handle_node(node.decl, scope, ctxt, stream)
         func.body = self._handle_node(node.body, scope, ctxt, stream)
-        # pprint_construct(func.body)
 
     def _handle_param_list(self, node, scope, ctxt, stream):
         """Handle ParamList nodes
@@ -2635,6 +2628,7 @@ class PfpInterp(object):
         iter_ = Compound()
 
         if node.init is not None:
+            node.init._add_to_ctxt = True
             self._handle_node(node.init, scope, init, stream)
 
         if node.cond is not None:
@@ -2644,8 +2638,8 @@ class PfpInterp(object):
             body.subcons.append(self._handle_node(node.stmt, scope, body, stream))
 
         if node.next is not None:
-            # do the next statement
-            iter_.subcons.append(self._handle_node(node.next, scope, iter_, stream))
+            node.next._add_to_ctxt = True
+            self._handle_node(node.next, scope, iter_, stream)
 
         ctxt.subcons.append(Loop(cond, init, body, iter_))
 
@@ -3191,7 +3185,7 @@ class Compound(C.Sequence):
             except C.StopFieldError:
                 break
             except CompoundReturn as e:
-                return e.expr(context) if callable(e.expr) else e.expr
+                return utils.evaluate(e.expr, context)
         return obj
 
 
@@ -3219,7 +3213,7 @@ class Loop(C.Subconstruct):
             context._index = i
 
             # Stop when the condition is false
-            cond = self.cond(context) if callable(self.cond) else self.cond
+            cond = utils.evaluate(self.cond, context)
             if cond is not None and not cond:
                 break
 
@@ -3293,3 +3287,18 @@ class Return(C.Construct):
 
     def _parse(self, stream, context, path):
         raise CompoundReturn(expr=self.expr)
+
+class Bytes(C.Bytes):
+    def _parse(self, stream, context, path):
+        length = utils.evaluate(self.length, context)
+        return C.stream_read(stream, length, path)
+
+class BitStreamedInteger(C.BitsInteger):
+    def _parse(self, stream, context, path):
+        # Kind of a hack, but BitwrappedStream already does what we want,
+        # so trick it into reading bits instead of bytes
+        stream.read, stream.read_bits = stream.read_bits, stream.read
+        ret = super()._parse(stream, context, path)
+        # Then revert the hack
+        stream.read, stream.read_bits = stream.read_bits, stream.read
+        return ret

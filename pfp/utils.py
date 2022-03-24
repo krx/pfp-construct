@@ -33,6 +33,14 @@ def _eval(param, context):
 
 def evaluate(param, context, recurse=True):
     if recurse:
+        if isinstance(param, C.BinExpr):
+            # The lhs and rhs might be in different contexts,
+            # so manually resolve them both
+            lhs = evaluate(param.lhs, context)
+            rhs = evaluate(param.rhs, context)
+            param = param.op(lhs, rhs)
+
+        # Keep walking up contexts until we resolve the param
         while hasattr(context, '_') and context._ is not None:
             try:
                 return _eval(param, context)

@@ -141,9 +141,7 @@ class ParamListDef(object):
 
         # TODO are default values for function parameters allowed in 010?
         for (param_name, param_cls), arg in zip(self._params, args):
-            # arg = arg(ctxt) if callable(arg) else arg
-            while callable(arg):
-                arg = arg(ctxt)
+            arg = utils.evaluate(arg, ctxt)
 
             # we don't instantiate a copy of byref params
             if getattr(param_cls, BYREF, False):

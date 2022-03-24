@@ -61,7 +61,7 @@ def main(argv=None):
         data=args.input,
         keep_successful=args.keep,
     )
-    print(dom._pfp__show(include_offset=args.show_offsets))
+    print(dom)
 
 
 if __name__ == "__main__":
