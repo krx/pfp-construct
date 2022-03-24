@@ -1,5 +1,5 @@
 import functools
-
+import pfp.utils
 import pfp.interp
 
 
@@ -25,7 +25,7 @@ def native(name, ret, interp=None, send_interp=False):
                 for param in params:
                     res += PYVAL(param)
                 return res
-        
+
         The code below is the code for the :any:`Int3 <pfp.native.dbg.int3>` function. Notice that it
         requires that the interpreter be sent as a parameter: ::
 

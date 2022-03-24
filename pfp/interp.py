@@ -21,14 +21,14 @@ import py010parser
 import py010parser.c_parser
 from py010parser import c_ast as AST
 
+import pfp.utils as utils
 import pfp
 import pfp.bitwrap as bitwrap
 import pfp.errors as errors
 # import pfp.fields as fields
-import construct as C
 import pfp.functions as functions
 import pfp.native as native
-import pfp.utils as utils
+import construct as C
 
 logging.basicConfig(level=logging.CRITICAL)
 
@@ -1680,10 +1680,11 @@ class PfpInterp(object):
         struct = self._handle_node(node.name, scope, ctxt, stream)
 
         try:
-            if node.field.name in struct:
-                sub_field = struct[node.field.name]
-            else:
-                sub_field = next(sc.subcon for sc in struct.subcons if sc.name == node.field.name)
+            # if node.field.name in struct:
+            sub_field = struct[node.field.name]
+            # else:
+                # sub_field = StatementWithContext(lambda _1, _2, context: context[node.field.name], None)
+                # sub_field = next(sc.subcon for sc in struct.subcons if sc.name == node.field.name)
         except AttributeError as e:
             # should be able to access implicit array items by index OR
             # access the last one's members directly without index
@@ -2108,7 +2109,7 @@ class PfpInterp(object):
                         break
 
             # Finally get the size
-            pprint_construct(con)
+            # pprint_construct(con)
             return con.sizeof()
 
     def _get_startof(self, val, field, ctxt):
@@ -2567,7 +2568,7 @@ class PfpInterp(object):
         """
         ary = self._handle_node(node.name, scope, ctxt, stream)
         subscript = self._handle_node(node.subscript, scope, ctxt, stream)
-        return ary[subscript]
+        return StatementWithContext(lambda _1, _2, context: ary[utils.evaluate(subscript, context)], None)
 
     def _handle_if(self, node, scope, ctxt, stream):
         """Handle If nodes
@@ -2591,12 +2592,11 @@ class PfpInterp(object):
             else_ctxt = Compound()
             else_ = self._handle_node(node.iffalse, scope, else_ctxt, stream)
             else_ = else_ if isinstance(else_, C.Construct) else C.Computed(else_)
-
-            stmt = C.IfThenElse(cond, then, else_)
         else:
             # Just a regular if
-            stmt = C.If(cond, then)
+            else_ = C.Pass
 
+        stmt = IfThenElse(cond, then, else_)
         if self._check_add_child(node):
             ctxt.subcons.append(stmt)
 
@@ -3153,6 +3153,15 @@ class Hoisted(C.Renamed):
 
         return res
 
+
+class IfThenElse(C.IfThenElse):
+    """
+    Just to use our own evaluate() over the default one
+    """
+    def _parse(self, stream, context, path):
+        condfunc = utils.evaluate(self.condfunc, context)
+        sc = self.thensubcon if condfunc else self.elsesubcon
+        return sc._parsereport(stream, context, path)
 
 class CompoundContinue(C.ConstructError):
     pass

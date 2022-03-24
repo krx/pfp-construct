@@ -642,7 +642,7 @@ def Printf(params, ctxt, scope, stream, coord, interp):
     :returns: TODO
 
     """
-    fmt = utils.evaluate(params[0], ctxt)
+    fmt = utils.evaluate(params[0], ctxt).decode()
     if len(params) == 1:
         if interp._printf:
             sys.stdout.write(fmt)
