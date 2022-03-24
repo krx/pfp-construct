@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pfp
 import pfp.errors
-from pfp.fields import *
+import pfp.interp
 import pfp.utils
 
 import utils
@@ -19,7 +19,7 @@ import utils
 
 class TestStrings(utils.PfpTestCase):
     def setUp(self):
-        pfp.fields.NumberBase.endian = pfp.fields.BIG_ENDIAN
+        pfp.interp.Endian.current = pfp.interp.Endian.BIG
 
     def tearDown(self):
         pass

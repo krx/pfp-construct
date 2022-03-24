@@ -12,6 +12,8 @@ import itertools
 import logging
 import os
 import re
+import struct
+from this import d
 import six
 import sys
 import traceback
@@ -47,23 +49,18 @@ class StructDecls(Decls):
 
 
 def StructDeclWithParams(scope, struct_cls, struct_args):
-    def _pfp__init(self, stream):
-        for param in self._pfp__node.args.params:
-            param.is_func_param = True
+    params = {p.name: val for p, val in zip(struct_cls.args.params, struct_args)}
 
-        params = self._pfp__interp._handle_node(
-            self._pfp__node.args, scope, self, None
-        )
-        param_list = params.instantiate(scope, struct_args, self._pfp__interp)
+    def _struct_func(val, field, context):
+        # Load the params into the local context
+        for k, v in params.items():
+            context[k] = v
 
-        if hasattr(super(self.__class__, self), "_pfp__init"):
-            super(self.__class__, self)._pfp__init(stream)
+        # Parse the rest normally
+        # return struct_cls._parsereport(context._io, context, "")
 
-    new_class = type(
-        struct_cls.__name__ + "_", (struct_cls,), {"_pfp__init": _pfp__init}
-    )
-    return new_class
-
+    struct_cls.func = StatementWithContext(_struct_func, None)
+    return struct_cls
 
 def StructUnionTypeRef(curr_scope, typedef_name, refd_name, interp, node):
     """Create a typedef that resolves itself dynamically. This is needed in
@@ -85,13 +82,13 @@ def StructUnionTypeRef(curr_scope, typedef_name, refd_name, interp, node):
     a ``ME`` instance is actually declared.
     """
     if isinstance(node, AST.Struct):
-        res = Struct()
+        res = Struct(node.args)
     elif isinstance(node, AST.Union):
-        res = C.Union(None)
+        res = Union(0)
 
 
-    for decl in node.decls:
-        interp._handle_node(decl, ctxt=res)
+    # for decl in node.decls:
+    #     interp._handle_node(decl, ctxt=res)
 
     return res
 
@@ -130,11 +127,12 @@ def StructUnionTypeRef(curr_scope, typedef_name, refd_name, interp, node):
 
 def StructUnionDef(typedef_name, interp, node):
     if isinstance(node, AST.Struct):
-        res = Struct()
+        res = Struct(node.args)
     elif isinstance(node, AST.Union):
-        res = C.Union(None)
+        res = Union(0)
 
     for decl in node.decls:
+        decl._add_to_ctxt = True
         interp._handle_node(decl, ctxt=res)
 
     return res
@@ -1194,6 +1192,7 @@ class PfpInterp(object):
         :returns: TODO
 
         """
+        # node.show()
         self._root = ctxt = '_root' / Struct()
         ctxt._pfp__scope = scope
         # self._root._pfp__name = "__root"
@@ -1204,25 +1203,41 @@ class PfpInterp(object):
 
         children = list(node.children())
 
-        # one pass to define all functions. Functions may only live at the
-        # top-level (functions may not be nested or contained within structs,
-        # if/else statements, or other code block types). aka hoisting
+        # Special pass to define enums since functions are getting processed immediately,
+        # so the types need to exist
         for child in children:
             if type(child) is tuple:
                 child = child[1]
-            if not isinstance(child, (AST.FuncDef, AST.Typedef)) \
-                    and not  is_forward_declared_struct(child):
-                continue
-            child._add_to_ctxt = True
-            self._handle_node(child, scope, ctxt, stream)
-            scope.clear_meta()
 
-        for child in children:
-            if type(child) is tuple:
-                child = child[1]
-            if isinstance(child, (AST.FuncDef, AST.Typedef)) or \
-                    is_forward_declared_struct(child):
-                continue
+        #     if (isinstance(child, AST.Decl) \
+        #         and hasattr(child, 'type') \
+        #         and isinstance(child.type, AST.Enum)) \
+        #         or isinstance(child, AST.Typedef) \
+        #         or is_forward_declared_struct(child):
+
+        #         child._add_to_ctxt = True
+        #         self._handle_node(child, scope, ctxt, stream)
+        #         scope.clear_meta()
+
+        # # one pass to define all functions. Functions may only live at the
+        # # top-level (functions may not be nested or contained within structs,
+        # # if/else statements, or other code block types). aka hoisting
+        # for child in children:
+        #     if type(child) is tuple:
+        #         child = child[1]
+        #     if not isinstance(child, (AST.FuncDef, AST.Typedef)) \
+        #             and not  is_forward_declared_struct(child):
+        #         continue
+        #     child._add_to_ctxt = True
+        #     self._handle_node(child, scope, ctxt, stream)
+        #     scope.clear_meta()
+
+        # for child in children:
+        #     if type(child) is tuple:
+        #         child = child[1]
+        #     if isinstance(child, (AST.FuncDef, AST.Typedef)) or \
+        #             is_forward_declared_struct(child):
+        #         continue
             child._add_to_ctxt = True
             res = self._handle_node(child, scope, ctxt, stream)
 
@@ -1231,7 +1246,6 @@ class PfpInterp(object):
 
         # pprint_construct(ctxt)
         # ctxt._pfp__process_fields_metadata()
-
         return ctxt.parse_stream(stream)
 
     def _handle_empty_statement(self, node, scope, ctxt, stream):
@@ -1257,16 +1271,17 @@ class PfpInterp(object):
 
         """
         self._dlog("handling cast")
-        to_type = self._handle_node(node.to_type, scope, ctxt, stream)
+        # to_type = self._handle_node(node.to_type, scope, ctxt, stream)
 
-        scope.push_meta("dest_type", to_type)
+        # scope.push_meta("dest_type", to_type)
         val_to_cast = self._handle_node(node.expr, scope, ctxt, stream)
-        scope.pop_meta("dest_type")
+        return val_to_cast
+        # scope.pop_meta("dest_type")
 
-        res = to_type()
+        # res = to_type()
 
-        res._pfp__set_value(val_to_cast)
-        return res
+        # res._pfp__set_value(val_to_cast)
+        # return res
 
     def _handle_typename(self, node, scope, ctxt, stream):
         """TODO: Docstring for _handle_typename
@@ -1364,12 +1379,13 @@ class PfpInterp(object):
         elif getattr(node, "is_func_param", False):
             # we want to keep this as a class and not instantiate it
             # instantiation will be done in functions.ParamListDef.instantiate
+            scope.add_local(field_name, field)
             field = (field_name, field)
 
         # locals and consts still get a field instance, but DON'T parse the
         # stream!
         elif "local" in node.quals or "const" in node.quals:
-            is_struct = isinstance(field, type) and issubclass(field, C.Struct)
+            # is_struct = isinstance(field, type) and issubclass(field, C.Struct)
             # if not isinstance(field, fields.Field) and not is_struct:
             # if not is_struct:
                 # field = field()
@@ -1378,13 +1394,13 @@ class PfpInterp(object):
             # this should only be able to be done with locals, right?
             # if not, move it to the bottom of the function
             if node.init is not None:
-                val = C.Computed(self._handle_node(node.init, scope, ctxt, stream))
-                if is_struct:
-                    field = val
-                    scope.add_local(field_name, field)
-                else:
+                field = C.Computed(self._handle_node(node.init, scope, ctxt, stream))
+                # if is_struct:
+                    # field = val
+                scope.add_local(field_name, field)
+                # else:
                     # field._pfp__set_value(val)
-                    field = val
+                    # field = val
                 self._add_child(ctxt, field_name, field, stream)
             elif isinstance(field, C.FormatField):
                 self._add_child(ctxt, field_name, C.Computed(0), stream)
@@ -1423,7 +1439,8 @@ class PfpInterp(object):
 
                     # TODO bitfield shit
                     if bitsize is not None:
-                        field = C.BitsInteger(bitsize)
+                        # field = C.Bitwise(C.BitsInteger(bitsize))
+                        field = C.Restreamed(C.BitsInteger(bitsize), C.bytes2bits, 1, C.bits2bytes, 8, lambda n: n//8)
                     # field = field.parse_stream(stream)
                     # field = field(
                     #     stream,
@@ -1509,7 +1526,6 @@ class PfpInterp(object):
         return hasattr(node, '_add_to_ctxt') and node._add_to_ctxt
 
     def _add_child(self, ctxt: C.Construct, field_name: str, field, stream):
-        # print(ctxt.subcons, field, field_name)
         for i, sc in enumerate(ctxt.subcons):
             if sc.name == field_name:
                 if isinstance(sc.subcon, C.Array):
@@ -1635,7 +1651,7 @@ class PfpInterp(object):
         # with byref function params
         # see issue #35 - we need to wrap the field cls so that the byref
         # doesn't permanently stay on the class
-        field = functions.ParamClsWrapper(field)
+        # field = functions.ParamClsWrapper(field)
         field.byref = True
         return field
 
@@ -1757,8 +1773,18 @@ class PfpInterp(object):
         struct_cls = self._handle_node(node.type, scope, ctxt, stream)
         struct_args = self._handle_node(node.args, scope, ctxt, stream)
 
-        res = StructDeclWithParams(scope, struct_cls, struct_args)
-        return res
+        params = {p.name: val for p, val in zip(struct_cls.args.params, struct_args)}
+        def _inject_params(val, field, context):
+            # Load the params into the local context
+            for k, v in params.items():
+                context[k] = v
+
+            # Parse the rest normally
+            # return struct_cls._parsereport(context._io, context, "")
+
+        # Inject the parameters right before the struct is defined
+        ctxt.subcons.append(StatementWithContext(_inject_params, None))
+        return struct_cls
 
     def _handle_struct(self, node, scope, ctxt, stream):
         """TODO: Docstring for _handle_struct.
@@ -1933,7 +1959,7 @@ class PfpInterp(object):
             # field._pfp__set_value(val)
             return val
 
-        raise UnsupportedConstantType(node.coord, node.type)
+        raise errors.UnsupportedConstantType(node.coord, node.type)
 
     def _handle_binary_op(self, node, scope, ctxt, stream):
         """TODO: Docstring for _handle_binary_op.
@@ -1957,45 +1983,45 @@ class PfpInterp(object):
             "%": lambda x, y: x % y,
             ">": lambda x, y: x > y,
             "<": lambda x, y: x < y,
-            "||": lambda x, y: x or y,
+            "||": lambda x, y: 1 if x or y else 0,
             ">=": lambda x, y: x >= y,
             "<=": lambda x, y: x <= y,
             "==": lambda x, y: x == y,
             "!=": lambda x, y: x != y,
-            "&&": lambda x, y: x and y,
+            "&&": lambda x, y: x.__and__(y),
             ">>": lambda x, y: x >> y,
             "<<": lambda x, y: x << y,
         }
 
-        dest_type = scope.get_meta("dest_type")
+        # dest_type = scope.get_meta("dest_type")
 
         left_val = self._handle_node(node.left, scope, ctxt, stream)
-        if dest_type is not None and not isinstance(left_val, dest_type):
-            new_left_val = dest_type()
-            new_left_val._pfp__set_value(left_val)
-            left_val = new_left_val
+        # if dest_type is not None and not isinstance(left_val, dest_type):
+        #     new_left_val = dest_type()
+        #     new_left_val._pfp__set_value(left_val)
+        #     left_val = new_left_val
 
         # short circuit power!
-        if node.op == "||" and left_val:
-            res = 1
-        else:
-            right_val = self._handle_node(node.right, scope, ctxt, stream)
-            if dest_type is not None and not isinstance(right_val, dest_type):
-                new_right_val = dest_type()
-                new_right_val._pfp__set_value(right_val)
-                right_val = new_right_val
+        # if node.op == "||" and left_val:
+        #     res = 1
+        # else:
+        right_val = self._handle_node(node.right, scope, ctxt, stream)
+        # if dest_type is not None and not isinstance(right_val, dest_type):
+        #     new_right_val = dest_type()
+        #     new_right_val._pfp__set_value(right_val)
+        #     right_val = new_right_val
 
-            if node.op not in switch:
-                raise errors.UnsupportedBinaryOperator(node.coord, node.op)
+        if node.op not in switch:
+            raise errors.UnsupportedBinaryOperator(node.coord, node.op)
 
-            # This happens with C.Path, the binary expression is automatically built
-            # print(node.op, left_val, right_val)
-            # if callable(left_val) or callable(right_val):
-            res = switch[node.op](left_val, right_val)
-            # else:
-            #     left_val = left_val.func if isinstance(left_val, Statement) else lambda _: left_val
-            #     right_val = right_val.func if isinstance(right_val, Statement) else lambda _: right_val
-            #     res = (lambda ctxt: switch[node.op](left_val(ctxt), right_val(ctxt)))
+        # This happens with C.Path, the binary expression is automatically built
+        # print(node.op, left_val, right_val)
+        # if callable(left_val) or callable(right_val):
+        res = switch[node.op](left_val, right_val)
+        # else:
+        #     left_val = left_val.func if isinstance(left_val, Statement) else lambda _: left_val
+        #     right_val = right_val.func if isinstance(right_val, Statement) else lambda _: right_val
+        #     res = (lambda ctxt: switch[node.op](left_val(ctxt), right_val(ctxt)))
 
         if type(res) is bool:
             if res:
@@ -2092,7 +2118,7 @@ class PfpInterp(object):
             return con.sizeof()
 
     def _get_startof(self, val, field, ctxt):
-        return ctxt._starts[get_this_name(field)]
+        return ctxt._starts[utils.get_field_name(field)]
 
     def _update_ctxt(self, ctxt, name, val):
         val = val(ctxt) if callable(val) else val
@@ -2103,20 +2129,20 @@ class PfpInterp(object):
 
     def _handle_pre_plus_plus(self, val, field, ctxt):
         val += 1
-        self._update_ctxt(ctxt, get_this_name(field), val)
+        self._update_ctxt(ctxt, utils.get_field_name(field), val)
         return val
 
     def _handle_pre_minus_minus(self, val, field, ctxt):
         val -= 1
-        self._update_ctxt(ctxt, get_this_name(field), val)
+        self._update_ctxt(ctxt, utils.get_field_name(field), val)
         return val
 
     def _handle_post_plus_plus(self, val, field, ctxt):
-        self._update_ctxt(ctxt, get_this_name(field), val + 1)
+        self._update_ctxt(ctxt, utils.get_field_name(field), val + 1)
         return val
 
     def _handle_post_minus_minus(self, val, field, ctxt):
-        self._update_ctxt(ctxt, get_this_name(field), val - 1)
+        self._update_ctxt(ctxt, utils.get_field_name(field), val - 1)
         return val
 
     def _handle_parentof(self, val, field, ctxt):
@@ -2178,7 +2204,7 @@ class PfpInterp(object):
         """
         return isinstance(val, functions.BaseFunction)
 
-    def _handle_id(self, node, scope, ctxt, stream):
+    def _handle_id(self, node, scope: Scope, ctxt, stream):
         """Handle an ID node (return a field object for the ID)
 
         :node: TODO
@@ -2195,14 +2221,15 @@ class PfpInterp(object):
 
         self._dlog("handling id {}".format(node.name))
         field = scope.get_id(node.name)
-
         if field is not None and isinstance(field, C.Construct):
             return C.this[node.name]
 
         is_lazy = getattr(node, "is_lazy", False)
 
         if field is None and not is_lazy:
-            raise errors.UnresolvedID(node.coord, node.name)
+            # raise errors.UnresolvedID(node.coord, node.name)
+            # fuck it, defer getting the field to parse time
+            return StatementWithContext(lambda _1, _2, context: C.this[node.name](context), None)
         elif is_lazy:
             return LazyField(node.name, scope)
 
@@ -2220,37 +2247,37 @@ class PfpInterp(object):
 
 
         def add_op(rval, lval, field, ctxt):
-            return self._update_ctxt(ctxt, get_this_name(field), lval + rval)
+            return self._update_ctxt(ctxt, utils.get_field_name(field), lval + rval)
 
         def sub_op(rval, lval, field, ctxt):
-            return self._update_ctxt(ctxt, get_this_name(field), lval - rval)
+            return self._update_ctxt(ctxt, utils.get_field_name(field), lval - rval)
 
         def div_op(rval, lval, field, ctxt):
-            return self._update_ctxt(ctxt, get_this_name(field), lval // rval)
+            return self._update_ctxt(ctxt, utils.get_field_name(field), lval // rval)
 
         def mod_op(rval, lval, field, ctxt):
-            return self._update_ctxt(ctxt, get_this_name(field), lval % rval)
+            return self._update_ctxt(ctxt, utils.get_field_name(field), lval % rval)
 
         def mul_op(rval, lval, field, ctxt):
-            return self._update_ctxt(ctxt, get_this_name(field), lval * rval)
+            return self._update_ctxt(ctxt, utils.get_field_name(field), lval * rval)
 
         def xor_op(rval, lval, field, ctxt):
-            return self._update_ctxt(ctxt, get_this_name(field), lval ^ rval)
+            return self._update_ctxt(ctxt, utils.get_field_name(field), lval ^ rval)
 
         def and_op(rval, lval, field, ctxt):
-            return self._update_ctxt(ctxt, get_this_name(field), lval & rval)
+            return self._update_ctxt(ctxt, utils.get_field_name(field), lval & rval)
 
         def or_op(rval, lval, field, ctxt):
-            return self._update_ctxt(ctxt, get_this_name(field), lval | rval)
+            return self._update_ctxt(ctxt, utils.get_field_name(field), lval | rval)
 
         def lshift_op(rval, lval, field, ctxt):
-            return self._update_ctxt(ctxt, get_this_name(field), lval << rval)
+            return self._update_ctxt(ctxt, utils.get_field_name(field), lval << rval)
 
         def rshift_op(rval, lval, field, ctxt):
-            return self._update_ctxt(ctxt, get_this_name(field), lval >> rval)
+            return self._update_ctxt(ctxt, utils.get_field_name(field), lval >> rval)
 
         def assign_op(rval, lval, field, ctxt):
-            return self._update_ctxt(ctxt, get_this_name(field), rval)
+            return self._update_ctxt(ctxt, utils.get_field_name(field), rval)
 
         switch = {
             "+=": add_op,
@@ -2282,6 +2309,7 @@ class PfpInterp(object):
         )
 
         if node.op is None:
+            # ??? when does this happen?
             self._dlog("value = {}".format(value))
             field._pfp__set_value(value)
         else:
@@ -2307,7 +2335,8 @@ class PfpInterp(object):
         """
         self._dlog("handling function definition")
         func = self._handle_node(node.decl, scope, ctxt, stream)
-        func.body = node.body
+        func.body = self._handle_node(node.body, scope, ctxt, stream)
+        # pprint_construct(func.body)
 
     def _handle_param_list(self, node, scope, ctxt, stream):
         """Handle ParamList nodes
@@ -2324,7 +2353,7 @@ class PfpInterp(object):
         # [(<name>, <field_class>), ...]
         params = []
         for param in node.params:
-            self._mark_id_as_lazy(param)
+            # self._mark_id_as_lazy(param)
             param_info = self._handle_node(param, scope, ctxt, stream)
             params.append(param_info)
 
@@ -2377,7 +2406,9 @@ class PfpInterp(object):
         func = self._handle_node(node.name, scope, ctxt, stream)
         # res = Statement(lambda ctxt: func.call(func_args, ctxt, scope, stream, self, node.coord))
         res = Statement(lambda ctxt: func.call(func_args, ctxt, scope, stream, self, node.coord), C.this)
-        ctxt.subcons.append(res)  # TODO do this somewhere else
+
+        if self._check_add_child(node):
+            ctxt.subcons.append(res)  # TODO do this somewhere else
         return res
 
     def _handle_expr_list(self, node, scope, ctxt, stream):
@@ -2446,7 +2477,11 @@ class PfpInterp(object):
         else:
             ret_val = self._handle_node(node.expr, scope, ctxt, stream)
         self._dlog("return value = {}".format(ret_val))
-        raise errors.InterpReturn(ret_val)
+
+        ret = Return(ret_val)
+        if self._check_add_child(node):
+            ctxt.subcons.append(ret)
+        return ret
 
     def _handle_enum(self, node, scope, ctxt, stream):
         """Handle enum nodes
@@ -2539,7 +2574,7 @@ class PfpInterp(object):
         """
         ary = self._handle_node(node.name, scope, ctxt, stream)
         subscript = self._handle_node(node.subscript, scope, ctxt, stream)
-        return ary[fields.PYVAL(subscript)]
+        return ary[subscript]
 
     def _handle_if(self, node, scope, ctxt, stream):
         """Handle If nodes
@@ -2571,6 +2606,7 @@ class PfpInterp(object):
 
         if self._check_add_child(node):
             ctxt.subcons.append(stmt)
+
         return stmt
 
     def _handle_ternary(self, node, scope, ctxt, stream):
@@ -2609,7 +2645,6 @@ class PfpInterp(object):
 
         if node.next is not None:
             # do the next statement
-            node.next.show()
             iter_.subcons.append(self._handle_node(node.next, scope, iter_, stream))
 
         ctxt.subcons.append(Loop(cond, init, body, iter_))
@@ -3017,6 +3052,14 @@ class Endian:
 
 
 class Struct(C.Struct):
+    def __init__(self, args=None, *subcons, **subconskw):
+        super().__init__(*subcons, **subconskw)
+
+        # These are for structs that take a parameter
+        self.args = args  # These are struct parameters, keeping these here for handling later
+        # self.func = func  # Parsing has to be done via a Statement "live", so this struct will defer parsing to this func
+
+
     def _parse(self, stream, context, path):
         obj = C.Container()
         obj._io = stream
@@ -3032,6 +3075,7 @@ class Struct(C.Struct):
                               _obj = obj,  # Adding this param for hoisting
                               _starts = {})  # Adding this for startof tracking
         context._root = context._.get("_root", context)
+
         for sc in self.subcons:
             try:
                 subobj = sc._parsereport(stream, context, path)
@@ -3042,16 +3086,37 @@ class Struct(C.Struct):
                 break
         return obj
 
-    # def __getitem__(self, name):
-    #     print('aaaaaaaaaaaaaaaaaaaaaaa')
-    #     if isinstance(name, str):
-    #         # Special case when resolving a Path
-    #         for sc in self.subcons:
-    #             if sc.name == name:
-    #                 return sc
 
-        # Default to the normal count stuff otherwise
-        return super().__getitem__(name)
+class Union(C.Union):
+    def _parse(self, stream, context, path):
+        obj = C.Container()
+        context = C.Container(_ = context,
+                              _params = context._params,
+                              _root = None,
+                              _parsing = context._parsing,
+                              _building = context._building,
+                              _sizing = context._sizing,
+                              _subcons = self._subcons,
+                              _io = stream,
+                              _index = context.get("_index", None),
+                              _obj = obj,  # Adding this param for hoisting
+                              _starts = {})  # Adding this for startof tracking
+        context._root = context._.get("_root", context)
+        fallback = C.stream_tell(stream, path)
+        forwards = {}
+        for i,sc in enumerate(self.subcons):
+            subobj = sc._parsereport(stream, context, path)
+            if sc.name:
+                obj[sc.name] = subobj
+                context[sc.name] = subobj
+            forwards[i] = C.stream_tell(stream, path)
+            if sc.name:
+                forwards[sc.name] = C.stream_tell(stream, path)
+            C.stream_seek(stream, fallback, 0, path)
+        parsefrom = C.evaluate(self.parsefrom, context)
+        if parsefrom is not None:
+            C.stream_seek(stream, forwards[parsefrom], 0, path) # raises KeyError
+        return obj
 
 class Hoisted(C.Renamed):
     """
@@ -3102,14 +3167,21 @@ class CompoundContinue(C.ConstructError):
 class CompoundBreak(C.ConstructError):
     pass
 
-class Compound(C.Sequence):
-    def __init__(self, *subcons, **subconskw):
-        super().__init__(*subcons, **subconskw)
 
+class CompoundReturn(C.ConstructError):
+    def __init__(self, message='', path=None, expr=None):
+        super().__init__(message, path)
+        self.expr = expr
+
+
+class Compound(C.Sequence):
+    """
+    A Compound statement (a code block)
+    Pretty much a Sequence, it just doesn't declare a new context when parsing
+    so it inherits the context of the closest Struct
+    """
     def _parse(self, stream, context, path):
         obj = C.ListContainer()
-        # context = Container(_ = context, _params = context._params, _root = None, _parsing = context._parsing, _building = context._building, _sizing = context._sizing, _subcons = self._subcons, _io = stream, _index = context.get("_index", None))
-        # context._root = context._.get("_root", context)
         for sc in self.subcons:
             try:
                 subobj = sc._parsereport(stream, context, path)
@@ -3118,7 +3190,10 @@ class Compound(C.Sequence):
                     context[sc.name] = subobj
             except C.StopFieldError:
                 break
+            except CompoundReturn as e:
+                return e.expr(context) if callable(e.expr) else e.expr
         return obj
+
 
 class BreakableCompound(Compound):
     def _parse(self, stream, context, path):
@@ -3161,6 +3236,7 @@ class Loop(C.Subconstruct):
                 if self.iter:
                     self.iter._parsereport(stream, context, path)
 
+
 class Statement(C.FuncPath):
     def __init__(self, func, operand):
         super().__init__(func, operand)
@@ -3175,18 +3251,20 @@ class Statement(C.FuncPath):
     def _parse(self, stream, context, path):
         return self(context)
 
-    # def __getattr__(self, name):
-    #     return Statement(lambda op: self._FuncPath__func(op)[name], self._FuncPath__operands)
-
     def __getitem__(self, name):
         return Statement(lambda *args: self._FuncPath__func(*args)[name], self._FuncPath__operand)
+
+    def __hash__(self) -> int:
+        return hash(str(self))
+
 
 class StatementWithContext(Statement):
     def __call__(self, operand, *args):
         # The operand here is the context during parsing
         try:
             # This might not be a defined var yet, just use None for the value if that happens
-            op = self._FuncPath__operand(operand) if callable(self._FuncPath__operand) else self._FuncPath__operand
+            # op = self._FuncPath__operand(operand) if callable(self._FuncPath__operand) else self._FuncPath__operand
+            op = utils.evaluate(self._FuncPath__operand, operand)
         except KeyError:
             op = None
 
@@ -3195,15 +3273,23 @@ class StatementWithContext(Statement):
     def __getitem__(self, name):
         return StatementWithContext(lambda *args: self._FuncPath__func(*args)[name], self._FuncPath__operand)
 
+
 @C.singleton
 class Break(C.Pass.__class__):
     def _parse(self, *_):
         raise CompoundBreak
+
 
 @C.singleton
 class Continue(C.Pass.__class__):
     def _parse(self, *_):
         raise CompoundContinue
 
-def get_this_name(path: C.Path):
-    return path._Path__field
+
+class Return(C.Construct):
+    def __init__(self, expr):
+        super().__init__()
+        self.expr = expr
+
+    def _parse(self, stream, context, path):
+        raise CompoundReturn(expr=self.expr)

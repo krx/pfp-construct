@@ -5,7 +5,7 @@ import contextlib
 import six
 import sys
 import time
-
+import construct as C
 
 @contextlib.contextmanager
 def timeit(msg, num=None):
@@ -26,6 +26,22 @@ def is_str(s):
         return True
     return False
 
+def _eval(param, context):
+    while callable(param):
+        param = param(context)
+    return param
+
+def evaluate(param, context, recurse=True):
+    if recurse:
+        while hasattr(context, '_') and context._ is not None:
+            try:
+                return _eval(param, context)
+            except KeyError:
+                context = context._
+    return _eval(param, context)
+
+def get_field_name(path):
+    return path._Path__field
 
 # Useful for very coarse version differentiation.
 PY3 = sys.version_info[0] == 3

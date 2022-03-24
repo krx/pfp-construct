@@ -12,7 +12,7 @@ import sys
 
 from pfp.native import native
 import pfp.errors as errors
-# import pfp.fields
+import pfp.utils as utils
 import construct as C
 
 
@@ -242,28 +242,22 @@ def RegExSearchW(params, ctxt, scope, stream, coord):
 
 
 # int SPrintf( char buffer[], const char format[] [, argument, ... ] )
-@native(name="SPrintf", ret=C.Int)
+@native(name="SPrintf", ret=int)
 def SPrintf(params, ctxt, scope, stream, coord):
     if len(params) < 2:
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "at least 2 args"
         )
 
+    dest = utils.get_field_name(params[0])
+    fmt = utils.evaluate(params[1], ctxt)
     if len(params) == 2:
-        params[0]._pfp__set_value(PYSTR(params[1]))
-        return len(PYSTR(params[1]))
+        ctxt[dest] = fmt
+        return len(fmt)
 
-    parts = []
-    for part in params[2:]:
-        if isinstance(part, pfp.fields.Array) or isinstance(
-            part, C.CString
-        ):
-            parts.append(PYSTR(part))
-        else:
-            parts.append(PYVAL(part))
-
-    new_value = PYSTR(params[1]) % tuple(parts)
-    params[0]._pfp__set_value(new_value)
+    parts = [utils.evaluate(p, ctxt) for p in params[2:]]
+    new_value = fmt % tuple(parts)
+    ctxt[dest] = new_value
     return len(new_value)
 
 

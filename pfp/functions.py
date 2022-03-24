@@ -31,7 +31,6 @@ class Function(BaseFunction):
 
     def call(self, args, ctxt, scope, stream, interp, coord, no_cast=False):
         # the no_cast arg does nothing for interpreted functions
-
         if self.body is None:
             raise errors.InvalidState(coord)
 
@@ -42,19 +41,20 @@ class Function(BaseFunction):
 
         self._scope.push()
 
-        params = self._params.instantiate(self._scope, args, interp)
+        params = self._params.instantiate(self._scope, args, ctxt)
+        ret_val = self.body._parsereport(ctxt._io, ctxt, "")
 
-        ret_val = None
-        try:
-            interp._handle_node(self.body, self._scope, ctxt, stream)
-        except errors.InterpReturn as e:
-            # TODO do some type checking on the return value??
-            # perhaps this should be done when initially traversing
-            # the AST of the function... a dry run traversing it to find
-            # return values??
-            ret_val = e.value
-        finally:
-            self._scope.pop()
+        # ret_val = None
+        # try:
+        #     interp._handle_node(self.body, self._scope, ctxt, stream)
+        # except errors.InterpReturn as e:
+        #     # TODO do some type checking on the return value??
+        #     # perhaps this should be done when initially traversing
+        #     # the AST of the function... a dry run traversing it to find
+        #     # return values??
+        #     ret_val = e.value
+        # finally:
+        #     self._scope.pop()
 
         return ret_val
 
@@ -122,51 +122,57 @@ class ParamListDef(object):
         self._params = params
         self._coords = coords
 
-    def instantiate(self, scope, args, interp):
+    def instantiate(self, scope, args, ctxt):
         """Create a ParamList instance for actual interpretation
 
         :args: TODO
         :returns: A ParamList object
 
         """
+        if len(args) != len(self._params):
+            raise errors.InvalidArguments(
+                self._coords,
+                [x.__class__.__name__ for x in args],
+                [x for x in self._params],
+            )
         param_instances = []
 
         BYREF = "byref"
 
         # TODO are default values for function parameters allowed in 010?
-        for param_name, param_cls in self._params:
-            # we don't instantiate a copy of byref params
-            if getattr(param_cls, "byref", False):
-                param_instances.append(BYREF)
-            else:
-                field = param_cls()
-                field._pfp__name = param_name
-                param_instances.append(field)
+        for (param_name, param_cls), arg in zip(self._params, args):
+            # arg = arg(ctxt) if callable(arg) else arg
+            while callable(arg):
+                arg = arg(ctxt)
 
-        if len(args) != len(param_instances):
-            raise errors.InvalidArguments(
-                self._coords,
-                [x.__class__.__name__ for x in args],
-                [x.__class__.__name__ for x in param_instances],
-            )
+            # we don't instantiate a copy of byref params
+            if getattr(param_cls, BYREF, False):
+                param_instances.append(arg)
+                ctxt[param_name] = arg
+            else:
+                # field = param_cls()
+                # field._pfp__name = param_name
+                # param_instances.append(arg.clone())
+                ctxt[param_name] = arg
+
 
         # TODO type checking on provided types
 
-        for x in six.moves.range(len(args)):
-            param = param_instances[x]
+        # for x in six.moves.range(len(args)):
+        #     param = param_instances[x]
 
-            # arrays are simply passed through into the function. We shouldn't
-            # have to worry about frozenness/unfrozenness at this point
-            if param is BYREF or isinstance(param, pfp.fields.Array):
-                param = args[x]
-                param_instances[x] = param
-                scope.add_local(self._params[x][0], param)
-            else:
-                param._pfp__set_value(args[x])
-                scope.add_local(param._pfp__name, param)
-            param._pfp__interp = interp
+        #     # arrays are simply passed through into the function. We shouldn't
+        #     # have to worry about frozenness/unfrozenness at this point
+        #     if param is BYREF or isinstance(param, pfp.fields.Array):
+        #         param = args[x]
+        #         param_instances[x] = param
+        #         scope.add_local(self._params[x][0], param)
+        #     else:
+        #         param._pfp__set_value(args[x])
+        #         scope.add_local(param._pfp__name, param)
+        #     param._pfp__interp = interp
 
-        return ParamList(param_instances)
+        # return ParamList(param_instances)
 
 
 class ParamList(object):

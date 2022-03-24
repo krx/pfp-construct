@@ -36,7 +36,7 @@ predefine(
     const int CHECKSUM_SUM64 = 10; // Same as CHECKSUM_BYTE
     const int CHECKSUM_CRC16 = 11;
     const int CHECKSUM_CRCCCITT = 12;
-    const int CHECKSUM_CRC32 = 13;C.Long
+    const int CHECKSUM_CRC32 = 13;
     const int CHECKSUM_ADLER32 = 14;
 """
 )
@@ -46,7 +46,7 @@ predefine(
 #    int64 size=0,
 #    int64 crcPolynomial=-1,
 #    int64 crcInitValue=-1 )
-@native(name="Checksum", ret=C.Long)
+@native(name="Checksum", ret=int)
 def Checksum(params, ctxt, scope, stream, coord):
     """
     Runs a simple checksum on a file and returns the result as a int64. The
@@ -100,7 +100,7 @@ def Checksum(params, ctxt, scope, stream, coord):
             coord, "at least 1 argument", "{} args".format(len(params))
         )
 
-    alg = PYVAL(params[0])
+    alg = utils.evaluate(params[0], ctxt)
     if alg not in checksum_types:
         raise errors.InvalidArguments(
             coord, "checksum alg must be one of (0-14)", "{}".format(alg)
@@ -108,20 +108,21 @@ def Checksum(params, ctxt, scope, stream, coord):
 
     start = 0
     if len(params) > 1:
-        start = PYVAL(params[1])
+        start = utils.evaluate(params[1], ctxt)
 
     size = 0
     if len(params) > 2:
-        size = PYVAL(params[2])
+        size = utils.evaluate(params[2], ctxt)
 
     crc_poly = -1
     if len(params) > 3:
-        crc_poly = PYVAL(params[3])
+        crc_poly = utils.evaluate(params[3], ctxt)
 
     crc_init = -1
     if len(params) > 4:
-        crc_init = PYVAL(params[4])
+        crc_init = utils.evaluate(params[4], ctxt)
 
+    stream = ctxt._io
     stream_pos = stream.tell()
 
     if start + size == 0:

@@ -7,6 +7,7 @@ compatability with 010 editor functions. Some of these functions
 are nops, some are fully implemented.
 """
 
+from pytest import skip
 import six
 import sys
 
@@ -30,7 +31,7 @@ def BigEndian(params, ctxt, scope, stream, coord):
 
 
 # void BitfieldDisablePadding()
-@native(name="BitfieldDisablePadding", ret=C.Pass, send_interp=True)
+@native(name="BitfieldDisablePadding", ret=None, send_interp=True)
 def BitfieldDisablePadding(params, ctxt, scope, stream, coord, interp):
     if len(params) > 0:
         raise errors.InvalidArguments(
@@ -40,7 +41,7 @@ def BitfieldDisablePadding(params, ctxt, scope, stream, coord, interp):
 
 
 # void BitfieldEnablePadding()
-@native(name="BitfieldEnablePadding", ret=C.Pass, send_interp=True)
+@native(name="BitfieldEnablePadding", ret=None, send_interp=True)
 def BitfieldEnablePadding(params, ctxt, scope, stream, coord, interp):
     if len(params) > 0:
         raise errors.InvalidArguments(
@@ -50,7 +51,7 @@ def BitfieldEnablePadding(params, ctxt, scope, stream, coord, interp):
 
 
 # void BitfieldLeftToRight()
-@native(name="BitfieldLeftToRight", ret=C.Pass, send_interp=True)
+@native(name="BitfieldLeftToRight", ret=None, send_interp=True)
 def BitfieldLeftToRight(params, ctxt, scope, stream, coord, interp):
     if len(params) > 0:
         raise errors.InvalidArguments(
@@ -60,7 +61,7 @@ def BitfieldLeftToRight(params, ctxt, scope, stream, coord, interp):
 
 
 # void BitfieldRightToLeft()
-@native(name="BitfieldRightToLeft", ret=C.Pass, send_interp=True)
+@native(name="BitfieldRightToLeft", ret=None, send_interp=True)
 def BitfieldRightToLeft(params, ctxt, scope, stream, coord, interp):
     if len(params) > 0:
         raise errors.InvalidArguments(
@@ -94,7 +95,7 @@ def ConvertDataToBytes(params, ctxt, scope, stream, coord):
 
 
 # void DeleteBytes( int64 start, int64 size )
-@native(name="DeleteBytes", ret=C.Pass)
+@native(name="DeleteBytes", ret=None)
 def DeleteBytes(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
@@ -129,7 +130,7 @@ def FileSize(params, ctxt, scope, stream, coord):
 
 
 # TFileList FindFiles( string dir, string filter )
-@native(name="FindFiles", ret=C.Pass)
+@native(name="FindFiles", ret=None)
 def FindFiles(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
@@ -141,7 +142,7 @@ def FPrintf(params, ctxt, scope, stream, coord):
 
 
 # int FSeek( int64 pos )
-@native(name="FSeek", ret=C.Int)
+@native(name="FSeek", ret=int)
 def FSeek(params, ctxt, scope, stream, coord):
     """Returns 0 if successful or -1 if the address is out of range
     """
@@ -152,48 +153,51 @@ def FSeek(params, ctxt, scope, stream, coord):
             "FSeek accepts only one argument",
         )
 
-    pos = PYVAL(params[0])
-    curr_pos = stream.tell()
+    pos = params[0]
+    while callable(pos):
+        pos = pos(ctxt)
+    return C.stream_seek(ctxt._io, pos, 0, "")
+    # curr_pos = stream.tell()
 
-    fsize = stream.size()
+    # fsize = stream.size()
 
-    if pos > fsize:
-        stream.seek(fsize)
-        return -1
-    elif pos < 0:
-        stream.seek(0)
-        return -1
+    # if pos > fsize:
+    #     stream.seek(fsize)
+    #     return -1
+    # elif pos < 0:
+    #     stream.seek(0)
+    #     return -1
 
-    diff = pos - curr_pos
-    if diff < 0:
-        stream.seek(pos)
-        return 0
+    # diff = pos - curr_pos
+    # if diff < 0:
+    #     stream.seek(pos)
+    #     return 0
 
-    data = stream.read(diff)
+    # data = stream.read(diff)
 
-    # let the ctxt automatically append numbers, as needed, unless the previous
-    # child was also a skipped field
-    skipped_name = "_skipped"
+    # # let the ctxt automatically append numbers, as needed, unless the previous
+    # # child was also a skipped field
+    # skipped_name = "_skipped"
 
-    if len(ctxt._pfp__children) > 0 and ctxt._pfp__children[
-        -1
-    ]._pfp__name.startswith("_skipped"):
-        old_name = ctxt._pfp__children[-1]._pfp__name
-        data = ctxt._pfp__children[-1].raw_data + data
-        skipped_name = old_name
-        ctxt._pfp__children = ctxt._pfp__children[:-1]
-        del ctxt._pfp__children_map[old_name]
+    # if len(ctxt._pfp__children) > 0 and ctxt._pfp__children[
+    #     -1
+    # ]._pfp__name.startswith("_skipped"):
+    #     old_name = ctxt._pfp__children[-1]._pfp__name
+    #     data = ctxt._pfp__children[-1].raw_data + data
+    #     skipped_name = old_name
+    #     ctxt._pfp__children = ctxt._pfp__children[:-1]
+    #     del ctxt._pfp__children_map[old_name]
 
-    tmp_stream = bitwrap.BitwrappedStream(six.BytesIO(data))
-    new_field = pfp.fields.Array(len(data), C.Byte, tmp_stream)
-    ctxt._pfp__add_child(skipped_name, new_field, stream)
-    scope.add_var(skipped_name, new_field)
+    # tmp_stream = bitwrap.BitwrappedStream(six.BytesIO(data))
+    # new_field = pfp.fields.Array(len(data), C.Byte, tmp_stream)
+    # ctxt._pfp__add_child(skipped_name, new_field, stream)
+    # scope.add_var(skipped_name, new_field)
 
-    return 0
+    # return 0
 
 
 # int FSkip( int64 offset )
-@native(name="FSkip", ret=C.Int)
+@native(name="FSkip", ret=int)
 def FSkip(params, ctxt, scope, stream, coord):
     """Returns 0 if successful or -1 if the address is out of range
     """
@@ -204,9 +208,13 @@ def FSkip(params, ctxt, scope, stream, coord):
             "FSkip accepts only one argument",
         )
 
-    skip_amt = PYVAL(params[0])
-    pos = skip_amt + stream.tell()
-    return FSeek([pos], ctxt, scope, stream, coord)
+    skip_amt = params[0]
+    while callable(skip_amt):
+        skip_amt = skip_amt(ctxt)
+
+    return C.stream_seek(ctxt._io, skip_amt, whence=1, path="")
+    # pos = skip_amt + stream.tell()
+    # return FSeek([pos], ctxt, scope, stream, coord)
 
 
 # int64 FTell()
@@ -221,7 +229,7 @@ def FTell(params, ctxt, scope, stream, coord):
 
 
 # void InsertBytes( int64 start, int64 size, uchar value=0 )
-@native(name="InsertBytes", ret=C.Pass)
+@native(name="InsertBytes", ret=None)
 def InsertBytes(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
@@ -263,7 +271,7 @@ def MakeDir(params, ctxt, scope, stream, coord):
 
 
 # void OverwriteBytes( int64 start, int64 size, uchar value=0 )
-@native(name="OverwriteBytes", ret=C.Pass)
+@native(name="OverwriteBytes", ret=None)
 def OverwriteBytes(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
@@ -375,7 +383,7 @@ def ReadLine(params, ctxt, scope, stream, coord):
 
 
 # void ReadBytes( uchar buffer[], int64 pos, int n )
-@native(name="ReadBytes", ret=C.Pass)
+@native(name="ReadBytes", ret=None)
 def ReadBytes(params, ctxt, scope, stream, coord):
     if len(params) != 3:
         raise errors.InvalidArguments(
@@ -496,108 +504,108 @@ def TextReadLineW(params, ctxt, scope, stream, coord):
 
 
 # void TextWriteLine( const char buffer[], int64 line, int includeLinefeeds=true )
-@native(name="TextWriteLine", ret=C.Pass)
+@native(name="TextWriteLine", ret=None)
 def TextWriteLine(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void TextWriteLineW( const wchar_t buffer[], int64 line, int includeLinefeeds=true )
-@native(name="TextWriteLineW", ret=C.Pass)
+@native(name="TextWriteLineW", ret=None)
 def TextWriteLineW(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteByte( int64 pos, char value )
-@native(name="WriteByte", ret=C.Pass)
+@native(name="WriteByte", ret=None)
 def WriteByte(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteDouble( int64 pos, double value )
-@native(name="WriteDouble", ret=C.Pass)
+@native(name="WriteDouble", ret=None)
 def WriteDouble(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteFloat( int64 pos, float value )
-@native(name="WriteFloat", ret=C.Pass)
+@native(name="WriteFloat", ret=None)
 def WriteFloat(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteHFloat( int64 pos, float value )
-@native(name="WriteHFloat", ret=C.Pass)
+@native(name="WriteHFloat", ret=None)
 def WriteHFloat(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteInt( int64 pos, int value )
-@native(name="WriteInt", ret=C.Pass)
+@native(name="WriteInt", ret=None)
 def WriteInt(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteInt64( int64 pos, int64 value )
-@native(name="WriteInt64", ret=C.Pass)
+@native(name="WriteInt64", ret=None)
 def WriteInt64(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteQuad( int64 pos, int64 value )
-@native(name="WriteQuad", ret=C.Pass)
+@native(name="WriteQuad", ret=None)
 def WriteQuad(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteShort( int64 pos, short value )
-@native(name="WriteShort", ret=C.Pass)
+@native(name="WriteShort", ret=None)
 def WriteShort(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteUByte( int64 pos, uchar value )
-@native(name="WriteUByte", ret=C.Pass)
+@native(name="WriteUByte", ret=None)
 def WriteUByte(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteUInt( int64 pos, uint value )
-@native(name="WriteUInt", ret=C.Pass)
+@native(name="WriteUInt", ret=None)
 def WriteUInt(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteUInt64( int64 pos, uint64 value )
-@native(name="WriteUInt64", ret=C.Pass)
+@native(name="WriteUInt64", ret=None)
 def WriteUInt64(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteUQuad( int64 pos, uint64 value )
-@native(name="WriteUQuad", ret=C.Pass)
+@native(name="WriteUQuad", ret=None)
 def WriteUQuad(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteUShort( int64 pos, ushort value )
-@native(name="WriteUShort", ret=C.Pass)
+@native(name="WriteUShort", ret=None)
 def WriteUShort(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteBytes( const uchar buffer[], int64 pos, int n )
-@native(name="WriteBytes", ret=C.Pass)
+@native(name="WriteBytes", ret=None)
 def WriteBytes(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteString( int64 pos, const char value[] )
-@native(name="WriteString", ret=C.Pass)
+@native(name="WriteString", ret=None)
 def WriteString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void WriteWString( int64 pos, const wstring value )
-@native(name="WriteWString", ret=C.Pass)
+@native(name="WriteWString", ret=None)
 def WriteWString(params, ctxt, scope, stream, coord):
     raise NotImplementedError()

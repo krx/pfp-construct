@@ -12,7 +12,7 @@ import sys
 from matplotlib.style import context
 
 from pfp.native import native, predefine
-# import pfp.fields
+import pfp.utils as utils
 import pfp.errors as errors
 import construct as C
 
@@ -26,42 +26,42 @@ import construct as C
 #    int forecolor=cNone,
 #    int backcolor=0xffffc4,
 #    int moveWithCursor=false )
-@native(name="AddBookmark", ret=C.Pass)
+@native(name="AddBookmark", ret=None)
 def AddBookmark(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void ClearClipboard()
-@native(name="ClearClipboard", ret=C.Pass)
+@native(name="ClearClipboard", ret=None)
 def ClearClipboard(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void CopyBytesToClipboard( uchar buffer[], int size, int charset=CHARSET_ANSI, int bigendian=false )
-@native(name="CopyBytesToClipboard", ret=C.Pass)
+@native(name="CopyBytesToClipboard", ret=None)
 def CopyBytesToClipboard(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void CopyStringToClipboard( const char str[], int charset=CHARSET_ANSI )
-@native(name="CopyStringToClipboard", ret=C.Pass)
+@native(name="CopyStringToClipboard", ret=None)
 def CopyStringToClipboard(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void CopyToClipboard()
-@native(name="CopyToClipboard", ret=C.Pass)
+@native(name="CopyToClipboard", ret=None)
 def CopyToClipboard(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void CutToClipboard()
-@native(name="CutToClipboard", ret=C.Pass)
+@native(name="CutToClipboard", ret=None)
 def CutToClipboard(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
@@ -73,42 +73,42 @@ def DeleteFile(params, ctxt, scope, stream, coord):
 
 
 # void DisableUndo()
-@native(name="DisableUndo", ret=C.Pass)
+@native(name="DisableUndo", ret=None)
 def DisableUndo(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void DisplayFormatBinary()
-@native(name="DisplayFormatBinary", ret=C.Pass)
+@native(name="DisplayFormatBinary", ret=None)
 def DisplayFormatBinary(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void DisplayFormatDecimal()
-@native(name="DisplayFormatDecimal", ret=C.Pass)
+@native(name="DisplayFormatDecimal", ret=None)
 def DisplayFormatDecimal(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void DisplayFormatHex()
-@native(name="DisplayFormatHex", ret=C.Pass)
+@native(name="DisplayFormatHex", ret=None)
 def DisplayFormatHex(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void DisplayFormatOctal()
-@native(name="DisplayFormatOctal", ret=C.Pass)
+@native(name="DisplayFormatOctal", ret=None)
 def DisplayFormatOctal(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void EnableUndo()
-@native(name="EnableUndo", ret=C.Pass)
+@native(name="EnableUndo", ret=None)
 def EnableUndo(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
@@ -121,7 +121,7 @@ def Exec(params, ctxt, scope, stream, coord):
 
 
 # void Exit( int errorcode )
-@native(name="Exit", ret=C.Pass)
+@native(name="Exit", ret=None)
 def Exit(params, ctxt, scope, stream, coord):
     if len(params) != 1:
         raise errors.InvalidArguments(
@@ -132,26 +132,26 @@ def Exit(params, ctxt, scope, stream, coord):
 
 
 # void ExpandAll()
-@native(name="ExpandAll", ret=C.Pass)
+@native(name="ExpandAll", ret=None)
 def ExpandAll(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void ExportCSV( const char filename[] )
-@native(name="ExportCSV", ret=C.Pass)
+@native(name="ExportCSV", ret=None)
 def ExportCSV(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void ExportXML( const char filename[] )
-@native(name="ExportXML", ret=C.Pass)
+@native(name="ExportXML", ret=None)
 def ExportXML(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void FileClose()
-@native(name="FileClose", ret=C.Pass)
+@native(name="FileClose", ret=None)
 def FileClose(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
@@ -196,7 +196,7 @@ def FileSaveRange(params, ctxt, scope, stream, coord):
 
 
 # void FileSelect( int index )
-@native(name="FileSelect", ret=C.Pass)
+@native(name="FileSelect", ret=None)
 def FileSelect(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
@@ -528,7 +528,7 @@ def InputOpenFileName(params, ctxt, scope, stream, coord):
 #    char title[],
 #    char filter[]="All files (*.*)",
 #    char filename[]="" )
-@native(name="InputOpenFileNames", ret=C.Pass)
+@native(name="InputOpenFileNames", ret=None)
 def InputOpenFileNames(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
@@ -606,7 +606,7 @@ def MessageBox(params, ctxt, scope, stream, coord):
 
 
 # void OutputPaneClear()
-@native(name="OutputPaneClear", ret=C.Pass)
+@native(name="OutputPaneClear", ret=None)
 def OutputPaneClear(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
@@ -620,14 +620,14 @@ def OutputPaneSave(params, ctxt, scope, stream, coord):
 
 
 # void OutputPaneCopy()
-@native(name="OutputPaneCopy", ret=C.Pass)
+@native(name="OutputPaneCopy", ret=None)
 def OutputPaneCopy(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void PasteFromClipboard()
-@native(name="PasteFromClipboard", ret=C.Pass)
+@native(name="PasteFromClipboard", ret=None)
 def PasteFromClipboard(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
@@ -642,20 +642,14 @@ def Printf(params, ctxt, scope, stream, coord, interp):
     :returns: TODO
 
     """
+    fmt = utils.evaluate(params[0], ctxt)
     if len(params) == 1:
         if interp._printf:
-            sys.stdout.write(params[0])
-        return len(params[0])
+            sys.stdout.write(fmt)
+        return len(fmt)
 
-    parts = []
-    for part in params[1:]:
-        # This value may be nested down a bunch of lambda statements,
-        # so keep calling it until we get a value
-        while callable(part):
-            part = part(ctxt)
-        parts.append(part)
-
-    to_print = str(params[0]) % tuple(parts)
+    parts = [utils.evaluate(param, ctxt) for param in params[1:]]
+    to_print = fmt % tuple(parts)
     res = len(to_print)
 
     if interp._printf:
@@ -707,7 +701,7 @@ def ProcessLocalToHeapAddress(params, ctxt, scope, stream, coord):
 
 
 # void RemoveBookmark( int index )
-@native(name="RemoveBookmark", ret=C.Pass)
+@native(name="RemoveBookmark", ret=None)
 def RemoveBookmark(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
@@ -720,19 +714,19 @@ def RenameFile(params, ctxt, scope, stream, coord):
 
 
 # void RequiresFile()
-@native(name="RequiresFile", ret=C.Pass)
+@native(name="RequiresFile", ret=None)
 def RequiresFile(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void RequiresVersion( int majorVer, int minorVer=0, int revision=0 )
-@native(name="RequiresVersion", ret=C.Pass)
+@native(name="RequiresVersion", ret=None)
 def RequiresVersion(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void RunTemplate( const char filename[]="", int clearOutput=false )
-@native(name="RunTemplate", ret=C.Pass)
+@native(name="RunTemplate", ret=None)
 def RunTemplate(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
@@ -769,21 +763,21 @@ const int cNone = 0xffffffff;
 
 
 # void SetBackColor( int color )
-@native(name="SetBackColor", ret=C.Pass)
+@native(name="SetBackColor", ret=None)
 def SetBackColor(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void SetColor( int forecolor, int backcolor )
-@native(name="SetColor", ret=C.Pass)
+@native(name="SetColor", ret=None)
 def SetColor(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
 
 
 # void SetForeColor( int color )
-@native(name="SetForeColor", ret=C.Pass)
+@native(name="SetForeColor", ret=None)
 def SetForeColor(params, ctxt, scope, stream, coord):
     # resolved: won't implement
     pass
@@ -797,7 +791,7 @@ def SetClipboardIndex(params, ctxt, scope, stream, coord):
 
 
 # void SetCursorPos( int64 pos )
-@native(name="SetCursorPos", ret=C.Pass)
+@native(name="SetCursorPos", ret=None)
 def SetCursorPos(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
@@ -827,7 +821,7 @@ def SetFileInterface(params, ctxt, scope, stream, coord):
 
 
 # void SetMouseWheelScrollSpeed( int speed )
-@native(name="SetMouseWheelScrollSpeed", ret=C.Pass)
+@native(name="SetMouseWheelScrollSpeed", ret=None)
 def SetMouseWheelScrollSpeed(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
@@ -839,7 +833,7 @@ def SetReadOnly(params, ctxt, scope, stream, coord):
 
 
 # void SetSelection( int64 start, int64 size )
-@native(name="SetSelection", ret=C.Pass)
+@native(name="SetSelection", ret=None)
 def SetSelection(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
@@ -857,25 +851,25 @@ def SetWorkingDirectoryW(params, ctxt, scope, stream, coord):
 
 
 # void Sleep( int milliseconds )
-@native(name="Sleep", ret=C.Pass)
+@native(name="Sleep", ret=None)
 def Sleep(params, ctxt, scope, stream, coord):
     raise NotImplementedError()
 
 
 # void StatusMessage( const char format[] [, argument, ... ] )
-@native(name="StatusMessage", ret=C.Pass)
+@native(name="StatusMessage", ret=None)
 def StatusMessage(params, ctxt, scope, stream, coord):
     pass
 
 
 # void Terminate( int force=true )
-@native(name="Terminate", ret=C.Pass)
+@native(name="Terminate", ret=None)
 def Terminate(params, ctxt, scope, stream, coord):
     raise errors.InterpExit()
 
 
 # void Warning( const char format[] [, argument, ... ] )
-@native(name="Warning", ret=C.Pass)
+@native(name="Warning", ret=None)
 def Warning(params, ctxt, scope, stream, coord):
     pass
 
