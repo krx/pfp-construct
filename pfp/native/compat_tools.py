@@ -454,8 +454,8 @@ which holds an array of target lengths
 */
 typedef struct {
     unsigned int count;
-    unsigned int start[];
-    unsigned int size[];
+    unsigned int start[this.count];
+    unsigned int size[this.count];
 } TFindResults;
 """
 )
@@ -469,30 +469,30 @@ def _find_helper(params, ctxt, scope, stream, coord, interp):
             coord, "at least 1 argument", "{} args".format(len(params))
         )
 
-    if (
-        isinstance(params[0], pfp.fields.Array) and params[0].is_stringable()
-    ) or isinstance(params[0], pfp.fields.String):
-        data = PYSTR(params[0])  # should correctly do null termination
-    else:
-        data = params[0]._pfp__build()
+    # if (
+    #     isinstance(params[0], pfp.fields.Array) and params[0].is_stringable()
+    # ) or isinstance(params[0], pfp.fields.String):
+    data = utils.evaluate(params[0], ctxt).rstrip(b'\0')  # should correctly do null termination
+    # else:
+    #     data = params[0]._pfp__build()
 
     if len(params) > 1:
-        match_case = not not PYVAL(params[1])
+        match_case = not not utils.evaluate(params[1], ctxt)
     else:
         match_case = True
 
     if len(params) > 2:
-        wholeword = not not PYVAL(params[2])
+        wholeword = not not utils.evaluate(params[2], ctxt)
     else:
         wholeword = False
 
     if len(params) > 3:
-        method = PYVAL(params[3])
+        method = utils.evaluate(params[3], ctxt)
     else:
         method = FINDMETHOD_NORMAL
 
     if len(params) > 4:
-        tolerance = PYVAL(params[4])
+        tolerance = utils.evaluate(params[4], ctxt)
         if tolerance != 0.0:
             raise NotImplementedError(
                 "tolerance in FindAll is not fully implemented"
@@ -501,23 +501,23 @@ def _find_helper(params, ctxt, scope, stream, coord, interp):
         tolerance = 0.0
 
     if len(params) > 5:
-        direction = PYVAL(params[5])
+        direction = utils.evaluate(params[5], ctxt)
     else:
         direction = 1
 
     if len(params) > 6:
-        start = PYVAL(params[6])
+        start = utils.evaluate(params[6], ctxt)
     else:
         start = 0
     FIND_MATCHES_START_OFFSET = start
 
     if len(params) > 7:
-        size = PYVAL(params[7])
+        size = utils.evaluate(params[7], ctxt)
     else:
         size = 0
 
     if len(params) > 8:
-        wildcard_match_length = PYVAL(params[8])
+        wildcard_match_length = utils.evaluate(params[8], ctxt)
     else:
         wildcard_match_length = 24
 
@@ -526,14 +526,14 @@ def _find_helper(params, ctxt, scope, stream, coord, interp):
     if method == FINDMETHOD_WILDCARDS:
         # * wildcard
         # make it a non-greedy match as well (add the question mark at the end)
-        regex = regex.replace(r"\*", ".{," + str(wildcard_match_length) + "}?")
+        regex = regex.replace(rb"\*", f".{{,{wildcard_match_length}}}?".encode())
         # ? wildcard
-        regex = regex.replace(r"\?", ".")
+        regex = regex.replace(rb"\?", b".")
     if method == FINDMETHOD_REGEX:
         regex = data
 
     if wholeword:
-        regex = "\\b" + regex + "\\b"
+        regex = b"\\b" + regex + b"\\b"
 
     regex = utils.binary(regex)
 
@@ -601,11 +601,11 @@ def FindAll(params, ctxt, scope, stream, coord, interp):
         map(lambda m: m.start() + FIND_MATCHES_START_OFFSET, matches)
     )
 
-    res.start = starts
+    res.start += starts
 
     # python3 map doesn't return a list
     sizes = list(map(lambda m: m.end() - m.start(), matches))
-    res.size = sizes
+    res.size += sizes
 
     return res
 
@@ -621,7 +621,7 @@ def FindAll(params, ctxt, scope, stream, coord, interp):
 #    int64 start=0,
 #    int64 size=0,
 #    int wildcardMatchLength=24 )
-@native(name="FindFirst", ret=C.Long, send_interp=True)
+@native(name="FindFirst", ret=int, send_interp=True)
 def FindFirst(params, ctxt, scope, stream, coord, interp):
     """
     This function is identical to the FindAll function except that the
@@ -641,7 +641,7 @@ def FindFirst(params, ctxt, scope, stream, coord, interp):
 
 
 # int64 FindNext( int dir=1 )
-@native(name="FindNext", ret=C.Long)
+@native(name="FindNext", ret=int)
 def FindNext(params, ctxt, scope, stream, coord):
     """
     This function returns the position of the next occurrence of the
@@ -655,7 +655,7 @@ def FindNext(params, ctxt, scope, stream, coord):
 
     direction = 1
     if len(params) > 0:
-        direction = PYVAL(params[0])
+        direction = utils.evaluate(params[0], ctxt)
 
     if direction != 1:
         # TODO maybe instead of storing the iterator in FIND_MATCHES_ITER,

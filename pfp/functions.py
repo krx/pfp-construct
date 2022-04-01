@@ -73,6 +73,7 @@ class NativeFunction(BaseFunction):
         self.send_interp = send_interp
 
     def call(self, args, ctxt, scope, stream, interp, coord, no_cast=False):
+        # args = [utils.evaluate(arg, ctxt) for arg in args]
         if self.send_interp:
             res = self.func(args, ctxt, scope, stream, coord, interp)
         else:

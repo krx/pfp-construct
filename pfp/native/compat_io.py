@@ -154,7 +154,10 @@ def FSeek(params, ctxt, scope, stream, coord):
         )
 
     pos = utils.evaluate(params[0], ctxt)
-    return C.stream_seek(ctxt._io, pos, 0, "")
+    if pos > ctxt._io.size():
+        return -1
+    C.stream_seek(ctxt._io, pos, 0, "")
+    return 0
     # curr_pos = stream.tell()
 
     # fsize = stream.size()
@@ -354,7 +357,6 @@ def ReadUByte(params, ctxt, scope, stream, coord):
 # uint ReadUInt( int64 pos=FTell() )
 @native(name="ReadUInt", ret=int)
 def ReadUInt(params, ctxt, scope, stream, coord):
-    # return C.Peek(C.Int32ul if pfp.interp.Endian.is_LE() else C.Int32ub).parse_stream(ctxt._io)
     return _read_data(params, ctxt, C.Int32ub, coord)
 
 
@@ -391,9 +393,9 @@ def ReadBytes(params, ctxt, scope, stream, coord):
             "3 arguments (buffer, pos, n)",
             "{} args".format(len(params)),
         )
-    if not isinstance(params[0], pfp.fields.Array):
+    if not isinstance(params[0], C.Bytes):
         raise errors.InvalidArguments(
-            coord, "buffer must be an array", params[0].__class__.__name__
+            coord, "buffer must be Bytes", params[0].__class__.__name__
         )
     if params[0].field_cls not in [pfp.fields.UChar, C.Byte]:
         raise errors.InvalidArguments(
@@ -416,7 +418,7 @@ def ReadBytes(params, ctxt, scope, stream, coord):
     curr_pos = stream.tell()
 
     vals = [
-        params[0].field_cls(stream) for x in six.moves.range(PYVAL(params[2]))
+        params[0].field_cls(stream) for x in six.moves.range(utils.evaluate(params[2], ctxt))
     ]
 
     stream.seek(curr_pos, 0)

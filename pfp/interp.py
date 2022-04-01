@@ -30,6 +30,8 @@ import pfp.functions as functions
 import pfp.native as native
 import construct as C
 
+from pathlib import Path
+
 logging.basicConfig(level=logging.CRITICAL)
 
 
@@ -84,6 +86,10 @@ def StructUnionTypeRef(curr_scope, typedef_name, refd_name, interp, node):
         res = Struct(node.args)
     elif isinstance(node, AST.Union):
         res = Union(0)
+
+    existing = curr_scope.get_type(node.name)
+    if existing and node.decls is None:
+        return existing
 
     if node.decls is not None:
         for decl in node.decls:
@@ -378,7 +384,7 @@ class PfpTypes(object):
 
         def wrapper(*args, **kwargs):
             # use args for struct arguments??
-            return type_cls(stream=self._null_stream)
+            return type_cls.parse_stream(self._null_stream)
 
         return wrapper
 
@@ -888,6 +894,11 @@ class PfpInterp(object):
 
         res = self._run(keep_successful)
         # res._pfp__finalize()
+
+        # Please delete these omg
+        Path('lextab.py').unlink(missing_ok=True)
+        Path('yacctab.py').unlink(missing_ok=True)
+
         return res
 
     def step_over(self):
@@ -1241,7 +1252,7 @@ class PfpInterp(object):
             # if isinstance(child, AST.FuncCall):
             #     ctxt.subcons.append(res)
 
-        pprint_construct(ctxt)
+        # pprint_construct(ctxt)
         # ctxt._pfp__process_fields_metadata()
         return ctxt.parse_stream(stream)
 
@@ -1422,15 +1433,15 @@ class PfpInterp(object):
             # in order to set the new context)
             # if not isinstance(field, fields.Field):
             # if not field.__class__.__module__ == '__builtin__':
-            if issubclass(field.__class__, C.FormatField):
+            if issubclass(field.__class__, (C.FormatField, C.Enum)):
                 # use the default bitfield direction
-                if self._bitfield_direction is self.BITFIELD_DIR_DEFAULT:
-                    bitfield_left_right = field.fmtstr[0] == '>'
-                else:
-                    bitfield_left_right = (
-                        self._bitfield_direction
-                        is self.BITFIELD_DIR_LEFT_RIGHT
-                    )
+                # if self._bitfield_direction is self.BITFIELD_DIR_DEFAULT:
+                #     bitfield_left_right = field.fmtstr[0] == '>'
+                # else:
+                #     bitfield_left_right = (
+                #         self._bitfield_direction
+                #         is self.BITFIELD_DIR_LEFT_RIGHT
+                #     )
 
                 # TODO bitfield shit
                 if bitsize is not None:
@@ -1484,7 +1495,6 @@ class PfpInterp(object):
                 added_child = True
             else:
                 pass
-                # print(field, stream)
                 # field = field.parse_stream(stream)
                 # field = field(
                 #     stream, metadata_processor=metadata_processor
@@ -1937,7 +1947,8 @@ class PfpInterp(object):
             # TODO should this be unicode?? will probably bite me later...
             # cut out the quotes
             "string": (
-                lambda x: str(utils.string_escape(x[1:-1])).encode('utf-8'),
+                lambda x: C.CString('utf8').build(utils.string_escape(x[1:-1])),
+                # lambda x: str(utils.string_escape(x[1:-1])).encode('utf-8'),
                 bytes,
             ),
         }
@@ -2109,10 +2120,14 @@ class PfpInterp(object):
                         break
 
             # Finally get the size
-            # pprint_construct(con)
             return con.sizeof()
 
     def _get_startof(self, val, field, ctxt):
+        names = utils.get_field_names(field)
+        c = ctxt
+        for name in names[:-1]:
+            c = c[name]
+        return c._starts[names[-1]]
         return ctxt._starts[utils.get_field_name(field)]
 
     def _update_ctxt(self, ctxt, name, val):
@@ -2272,6 +2287,8 @@ class PfpInterp(object):
             return self._update_ctxt(ctxt, utils.get_field_name(field), lval >> rval)
 
         def assign_op(rval, lval, field, ctxt):
+            # while not isinstance(field, C.Path):
+                # field = field(ctxt)
             return self._update_ctxt(ctxt, utils.get_field_name(field), rval)
 
         switch = {
@@ -2477,7 +2494,7 @@ class PfpInterp(object):
             ctxt.subcons.append(ret)
         return ret
 
-    def _handle_enum(self, node, scope, ctxt, stream):
+    def _handle_enum(self, node, scope: Scope, ctxt, stream):
         """Handle enum nodes
 
         :node: TODO
@@ -2510,8 +2527,8 @@ class PfpInterp(object):
             # curr_val.signed = enum_cls.signed
             # curr_val._pfp__freeze()
             enum_vals[enumerator.name] = curr_val
-            # enum_vals[curr_val] = enumerator.name
             scope.add_local(enumerator.name, curr_val)
+
             prev_val = curr_val
 
         if node.name is not None:
@@ -3055,7 +3072,7 @@ class Struct(C.Struct):
 
 
     def _parse(self, stream, context, path):
-        obj = C.Container()
+        obj = C.Container(_starts = {})
         obj._io = stream
         context = C.Container(_ = context,
                               _params = context._params,
@@ -3083,7 +3100,7 @@ class Struct(C.Struct):
 
 class Union(C.Union):
     def _parse(self, stream, context, path):
-        obj = C.Container()
+        obj = C.Container(_starts = {})
         context = C.Container(_ = context,
                               _params = context._params,
                               _root = None,
@@ -3122,6 +3139,7 @@ class Hoisted(C.Renamed):
         start_off = C.stream_tell(stream, path)
         if self.name not in context._starts:
             context._starts[self.name] = start_off
+            context._obj._starts[self.name] = start_off
 
         # Update endianness on the fly
         if isinstance(self.subcon, C.FormatField):

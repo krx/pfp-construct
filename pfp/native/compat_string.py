@@ -17,32 +17,29 @@ import construct as C
 
 
 def _cmp(a, b):
-    if six.PY3:
-        return (a > b) - (a < b)
-    else:
-        return cmp(a, b)
+    return (a > b) - (a < b)
 
 
 # http://www.sweetscape.com/010editor/manual/FuncString.htm
 
 # double Atof( const char s[] )
-@native(name="Atof", ret=C.Double)
+@native(name="Atof", ret=float)
 def Atof(params, ctxt, scope, stream, coord):
     if len(params) < 1:
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "one arg"
         )
-    return float(PYSTR(params[0]))
+    return float(utils.evaluate(params[0], ctxt))
 
 
 # int Atoi( const char s[] )
-@native(name="Atoi", ret=C.Int)
+@native(name="Atoi", ret=int)
 def Atoi(params, ctxt, scope, stream, coord):
     if len(params) < 1:
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "one arg"
         )
-    return int(PYSTR(params[0]))
+    return int(utils.evaluate(params[0], ctxt))
 
 
 # int64 BinaryStrToInt( const char s[] )
@@ -136,7 +133,7 @@ def IntToBinaryStr(params, ctxt, scope, stream, coord):
 
 
 # int Memcmp( const uchar s1[], const uchar s2[], int n )
-@native(name="Memcmp", ret=C.Int)
+@native(name="Memcmp", ret=int)
 def Memcmp(params, ctxt, scope, stream, coord):
     """
     int Memcmp( const uchar s1[], const uchar s2[], int n )
@@ -149,9 +146,9 @@ def Memcmp(params, ctxt, scope, stream, coord):
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "3 arguments",
         )
-    s1 = PYSTR(params[0])
-    s2 = PYSTR(params[1])
-    n = PYVAL(params[2])
+    s1 = utils.evaluate(params[0], ctxt)
+    s2 = utils.evaluate(params[1], ctxt)
+    n = utils.evaluate(params[2], ctxt)
 
     s1_sub = s1[:n]
     s2_sub = s2[:n]
@@ -160,7 +157,7 @@ def Memcmp(params, ctxt, scope, stream, coord):
 
 
 # void Memcpy( uchar dest[], const uchar src[], int n, int destOffset=0, int srcOffset=0 )
-@native(name="Memcpy", ret=C.Pass)
+@native(name="Memcpy", ret=None)
 def Memcpy(params, ctxt, scope, stream, coord):
     if len(params) < 3:
         raise errors.InvalidArguments(
@@ -172,37 +169,34 @@ def Memcpy(params, ctxt, scope, stream, coord):
         )
 
     dest = params[0]
-    src = params[1]
-    n = PYVAL(params[2])
+    src = utils.evaluate(params[1], ctxt)
+    n = utils.evaluate(params[2], ctxt)
 
     if len(params) > 3:
-        dest_offset = PYVAL(params[3])
+        dest_offset = utils.evaluate(params[3], ctxt)
     else:
         dest_offset = 0
 
     if len(params) > 4:
-        src_offset = PYVAL(params[4])
+        src_offset = utils.evaluate(params[4], ctxt)
     else:
         src_offset = 0
 
-    if not isinstance(dest, pfp.fields.Array):
-        raise errors.InvalidArguments(
-            coord, dest.__class__.__name__, "an array"
-        )
 
-    if not isinstance(src, pfp.fields.Array):
-        raise errors.InvalidArguments(
-            coord, src.__class__.__name__, "an array"
-        )
-
-    count = 0
-    while n > 0:
-        val = dest.field_cls()
-        val._pfp__set_value(src[src_offset + count]._pfp__value)
-        # TODO clone it
-        dest[dest_offset + count] = val
-        count += 1
-        n -= 1
+    dest_val = utils.evaluate(dest, ctxt)
+    if dest_val is None:
+        dest_val = b''
+    val = dest_val[:dest_offset] + src[src_offset:src_offset + n] + dest_val[dest_offset + n:]
+    utils.set_field(dest, ctxt, val)
+    utils.set_field(dest, ctxt._obj, val)
+    # count = 0
+    # while n > 0:
+    #     val = dest.field_cls()
+    #     val._pfp__set_value(src[src_offset + count]._pfp__value)
+    #     # TODO clone it
+    #     dest[dest_offset + count] = val
+    #     count += 1
+    #     n -= 1
 
 
 # void Memset( uchar s[], int c, int n )
@@ -274,15 +268,15 @@ def Strcat(params, ctxt, scope, stream, coord):
 
 
 # int Strchr( const char s[], char c )
-@native(name="Strchr", ret=C.Int)
+@native(name="Strchr", ret=int)
 def Strchr(params, ctxt, scope, stream, coord):
     if len(params) != 2:
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "2 arguments"
         )
 
-    haystack = PYSTR(params[0])
-    needle = chr(PYVAL(params[1]))
+    haystack = utils.evaluate(params[0], ctxt)
+    needle = utils.evaluate(params[1], ctxt)
 
     try:
         return haystack.index(needle)
@@ -293,28 +287,31 @@ def Strchr(params, ctxt, scope, stream, coord):
 
 
 # int Strcmp( const char s1[], const char s2[] )
-@native(name="Strcmp", ret=C.Int)
+@native(name="Strcmp", ret=int)
 def Strcmp(params, ctxt, scope, stream, coord):
     if len(params) != 2:
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "2 arguments"
         )
-    str1 = PYSTR(params[0])
-    str2 = PYSTR(params[1])
+    str1 = utils.evaluate(params[0], ctxt)
+    str2 = utils.evaluate(params[1], ctxt)
 
     return _cmp(str1, str2)
 
 
 # void Strcpy( char dest[], const char src[] )
-@native(name="Strcpy", ret=C.Pass)
+@native(name="Strcpy", ret=None)
 def Strcpy(params, ctxt, scope, stream, coord):
     if len(params) != 2:
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "2 arguments"
         )
 
-    params[0]._pfp__set_value(PYSTR(params[1]))
+    dst = params[0]
+    src = utils.evaluate(params[1], ctxt)
 
+    utils.set_field(dst, ctxt, src)
+    utils.set_field(dst, ctxt._obj, src)
 
 # char[] StrDel( const char str[], int start, int count )
 @native(name="StrDel", ret=C.CString)
@@ -323,14 +320,14 @@ def StrDel(params, ctxt, scope, stream, coord):
 
 
 # int Stricmp( const char s1[], const char s2[] )
-@native(name="Stricmp", ret=C.Int)
+@native(name="Stricmp", ret=int)
 def Stricmp(params, ctxt, scope, stream, coord):
     if len(params) != 2:
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "2 arguments"
         )
-    str1 = PYSTR(params[0]).lower()
-    str2 = PYSTR(params[1]).lower()
+    str1 = utils.evaluate(params[0], ctxt).lower()
+    str2 = utils.evaluate(params[1], ctxt).lower()
 
     return _cmp(str1, str2)
 
@@ -378,70 +375,70 @@ def StringToWString(params, ctxt, scope, stream, coord):
 
 
 # int Strlen( const char s[] )
-@native(name="Strlen", ret=C.Int)
+@native(name="Strlen", ret=int)
 def Strlen(params, ctxt, scope, stream, coord):
     if len(params) != 1:
         raise errors.InvalidArguments(
             coord, "1 argument", "{} args".format(len(params))
         )
-    val = params[0]
-    if isinstance(val, pfp.fields.Array):
-        val = val._array_to_str()
-    else:
-        val = PYVAL(val)
+    val = utils.evaluate(params[0], ctxt)
     return len(val)
 
 
 # int Strncmp( const char s1[], const char s2[], int n )
-@native(name="Strncmp", ret=C.Int)
+@native(name="Strncmp", ret=int)
 def Strncmp(params, ctxt, scope, stream, coord):
     if len(params) != 3:
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "3 arguments"
         )
-    max_chars = PYVAL(params[2])
-    str1 = PYSTR(params[0])[:max_chars]
-    str2 = PYSTR(params[1])[:max_chars]
+    max_chars = C.evaluate(params[2], ctxt)
+    str1 = C.evaluate(params[0], ctxt)[:max_chars]
+    str2 = C.evaluate(params[1], ctxt)[:max_chars]
 
     return _cmp(str1, str2)
 
 
 # void Strncpy( char dest[], const char src[], int n )
-@native(name="Strncpy", ret=C.Pass)
+@native(name="Strncpy", ret=None)
 def Strncpy(params, ctxt, scope, stream, coord):
     if len(params) != 3:
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "3 arguments"
         )
 
-    max_len = PYVAL(params[2])
-    params[0]._pfp__set_value(PYSTR(params[1])[:max_len])
+    dst = params[0]
+    src = utils.evaluate(params[1], ctxt)
+    n = utils.evaluate(params[2], ctxt)
 
+
+    utils.set_field(dst, ctxt, src[:n])
+    utils.set_field(dst, ctxt._obj, src[:n])
 
 # int Strnicmp( const char s1[], const char s2[], int n )
-@native(name="Strnicmp", ret=C.Int)
+@native(name="Strnicmp", ret=int)
 def Strnicmp(params, ctxt, scope, stream, coord):
     if len(params) != 3:
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "3 arguments"
         )
-    max_chars = PYVAL(params[2])
-    str1 = PYSTR(params[0])[:max_chars].lower()
-    str2 = PYSTR(params[1])[:max_chars].lower()
+    max_chars = utils.evaluate(params[2], ctxt)
+    str1 = utils.evaluate(params[0], ctxt)[:max_chars].lower()
+    str2 = utils.evaluate(params[1], ctxt)[:max_chars].lower()
 
     return _cmp(str1, str2)
 
 
 # int Strstr( const char s1[], const char s2[] )
-@native(name="Strstr", ret=C.Int)
+@native(name="Strstr", ret=int)
 def Strstr(params, ctxt, scope, stream, coord):
     if len(params) != 2:
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "2 arguments"
         )
 
-    haystack = PYSTR(params[0])
-    needle = PYSTR(params[1])
+    haystack = utils.evaluate(params[0], ctxt)
+    needle = utils.evaluate(params[1], ctxt).rstrip(b'\0')
 
     try:
         return haystack.index(needle)
@@ -452,18 +449,18 @@ def Strstr(params, ctxt, scope, stream, coord):
 
 
 # char[] SubStr( const char str[], int start, int count=-1 )
-@native(name="SubStr", ret=C.CString)
+@native(name="SubStr", ret=str)
 def SubStr(params, ctxt, scope, stream, coord):
     if len(params) < 2:
         raise errors.InvalidArguments(
             coord, "2 arguments", "{} args".format(len(params))
         )
 
-    string = PYSTR(params[0])
-    start = PYVAL(params[1])
+    string = C.evaluate(params[0], ctxt).decode()
+    start = C.evaluate(params[1], ctxt)
     count = -1
     if len(params) > 2:
-        count = PYVAL(params[2])
+        count = C.evaluate(params[2], ctxt)
     if count < 0:
         count = -1
 
@@ -480,13 +477,13 @@ def TimeTToString(params, ctxt, scope, stream, coord):
 
 
 # char ToLower( char c )
-@native(name="ToLower", ret=C.Byte)
+@native(name="ToLower", ret=int)
 def ToLower(params, ctxt, scope, stream, coord):
     if len(params) != 1:
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "1 argument"
         )
-    return ord(chr(PYVAL(params[0])).lower())
+    return ord(chr(utils.evaluate(params[0], ctxt)).lower())
 
 
 # wchar_t ToLowerW( wchar_t c )
@@ -496,13 +493,13 @@ def ToLowerW(params, ctxt, scope, stream, coord):
 
 
 # char ToUpper( char c )
-@native(name="ToUpper", ret=C.Byte)
+@native(name="ToUpper", ret=int)
 def ToUpper(params, ctxt, scope, stream, coord):
     if len(params) != 1:
         raise errors.InvalidArguments(
             coord, "{} args".format(len(params)), "1 argument"
         )
-    return ord(chr(PYVAL(params[0])).upper())
+    return ord(chr(utils.evaluate(params[0], ctxt)).upper())
 
 
 # void WMemcmp( const wchar_t s1[], const wchar_t s2[], int n )

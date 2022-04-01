@@ -127,7 +127,7 @@ def Exit(params, ctxt, scope, stream, coord):
         raise errors.InvalidArguments(
             coord, "1 arguments", "{} args".format(len(params))
         )
-    error_code = PYVAL(params[0])
+    error_code = utils.evaluate(params[0], ctxt)
     raise errors.InterpExit(error_code)
 
 
@@ -642,13 +642,19 @@ def Printf(params, ctxt, scope, stream, coord, interp):
     :returns: TODO
 
     """
-    fmt = utils.evaluate(params[0], ctxt).decode()
+    fmt = utils.evaluate(params[0], ctxt).rstrip(b'\0').decode()
     if len(params) == 1:
         if interp._printf:
             sys.stdout.write(fmt)
         return len(fmt)
 
-    parts = [utils.evaluate(param, ctxt) for param in params[1:]]
+    parts = []
+    for param in params[1:]:
+        part = utils.evaluate(param, ctxt)
+        if isinstance(part, bytes):
+            part = part.decode()
+        parts.append(part if part is not None else '')
+
     to_print = fmt % tuple(parts)
     res = len(to_print)
 

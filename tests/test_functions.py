@@ -3,19 +3,13 @@
 
 import os
 
-try:
-    from StringIO import StringIO
-
-# StringIO does not exist in python3
-except ImportError as e:
-    from io import StringIO
+from io import StringIO
 import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pfp
-import pfp.fields
 import pfp.interp
 import pfp.utils
 
@@ -24,7 +18,7 @@ import utils
 
 class TestFunctions(utils.PfpTestCase):
     def setUp(self):
-        pfp.fields.NumberBase.endian = pfp.fields.LITTLE_ENDIAN
+        pfp.interp.Endian.current = pfp.interp.Endian.LITTLE
 
     def tearDown(self):
         pass
@@ -112,7 +106,7 @@ class TestFunctions(utils.PfpTestCase):
             return 555
 
         interp = pfp.interp.PfpInterp()
-        interp.add_native(name="func", func=func, ret=pfp.fields.Int)
+        interp.add_native(name="func", func=func, ret=int)
 
         dom = self._test_parse_build(
             "",

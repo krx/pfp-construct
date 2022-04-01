@@ -48,7 +48,27 @@ def evaluate(param, context, recurse=True):
                 context = context._
     return _eval(param, context)
 
-def get_field_name(path):
+def set_field(path, ctxt, src):
+    if isinstance(path, C.Path):
+        path = get_field_names(path)
+    dst = ctxt
+    for name in path[:-1]:
+        dst = dst[name]
+    dst[path[-1]] = src
+
+
+def get_field_names(path: C.Path):
+    parent = path._Path__parent
+    names = []
+
+    while parent is not None:
+        names.append(path._Path__field)
+        path = parent
+        parent = path._Path__parent
+
+    return names[::-1]
+
+def get_field_name(path: C.Path):
     return path._Path__field
 
 # Useful for very coarse version differentiation.

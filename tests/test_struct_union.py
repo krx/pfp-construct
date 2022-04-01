@@ -33,7 +33,7 @@ class TestStructUnion(utils.PfpTestCase):
                 MY_STRUCT s;
             """
         )
-        assert dom.s.magic == "\x00\x01\x02\x03"
+        assert dom.s.magic == b"\x00\x01\x02\x03"
         assert dom.s.filesize == 0x03020100
 
     def test_struct_vit9696_2(self):
@@ -48,7 +48,7 @@ class TestStructUnion(utils.PfpTestCase):
                 MY_STRUCT s;
             """
         )
-        assert dom.s.magic == "\x00\x01\x02\x03"
+        assert dom.s.magic == b"\x00\x01\x02\x03"
         assert dom.s.filesize == 0x03020100
 
     def test_struct_vit9696_3(self):
@@ -63,7 +63,7 @@ class TestStructUnion(utils.PfpTestCase):
                 MY_STRUCT s;
             """
         )
-        assert dom.s.magic == "\x00\x01\x02\x03"
+        assert dom.s.magic == b"\x00\x01\x02\x03"
         assert dom.s.filesize == 0x03020100
 
     def test_struct_vit9696_4(self):
@@ -78,7 +78,7 @@ class TestStructUnion(utils.PfpTestCase):
                 struct MY_STRUCT s;
             """
         )
-        assert dom.s.magic == "\x00\x01\x02\x03"
+        assert dom.s.magic == b"\x00\x01\x02\x03"
         assert dom.s.filesize == 0x03020100
 
     def test_struct_vit9696_5(self):
@@ -95,7 +95,7 @@ class TestStructUnion(utils.PfpTestCase):
             """,
             debug=False,
         )
-        assert dom.s.magic == "\x00\x01\x02\x03"
+        assert dom.s.magic == b"\x00\x01\x02\x03"
         assert dom.s.filesize == 0x03020100
 
     def test_basic_struct(self):
@@ -118,7 +118,7 @@ class TestStructUnion(utils.PfpTestCase):
 
     def test_field_path(self):
         dom = self._test_parse_build(
-            "Abbbb4141414142424242",
+            "Abbbb\x41\x41\x41\x41\x42\x42\x42\x42",
             """
                 struct {
                     struct {
@@ -132,17 +132,26 @@ class TestStructUnion(utils.PfpTestCase):
                 } root;
             """,
         )
-        self.assertEqual(dom.root._pfp__path(), "root")
-        self.assertEqual(dom.root.some_int2._pfp__path(), "root.some_int2")
-        self.assertEqual(dom.root.nested1._pfp__path(), "root.nested1")
-        self.assertEqual(dom.root.nested1.some_int._pfp__path(), "root.nested1.some_int")
-        self.assertEqual(dom.root.nested1.nested2._pfp__path(), "root.nested1.nested2")
-        self.assertEqual(dom.root.nested1.nested2.inner._pfp__path(), "root.nested1.nested2.inner")
-        self.assertEqual(dom.root.nested1.nested2.array._pfp__path(), "root.nested1.nested2.array")
-        self.assertEqual(dom.root.nested1.nested2.array[0]._pfp__path(), "root.nested1.nested2.array[0]")
-        self.assertEqual(dom.root.nested1.nested2.array[1]._pfp__path(), "root.nested1.nested2.array[1]")
-        self.assertEqual(dom.root.nested1.nested2.array[2]._pfp__path(), "root.nested1.nested2.array[2]")
-        self.assertEqual(dom.root.nested1.nested2.array[3]._pfp__path(), "root.nested1.nested2.array[3]")
+
+        self.assertEqual(dom.root.nested1.nested2.inner, ord('A'))
+        self.assertEqual(dom.root.nested1.nested2.array[0], ord('b'))
+        self.assertEqual(dom.root.nested1.nested2.array[1], ord('b'))
+        self.assertEqual(dom.root.nested1.nested2.array[2], ord('b'))
+        self.assertEqual(dom.root.nested1.nested2.array[3], ord('b'))
+        self.assertEqual(dom.root.nested1.some_int, 0x41414141)
+        self.assertEqual(dom.root.some_int2, 0x42424242)
+
+        # self.assertEqual(dom.root._pfp__path(), "root")
+        # self.assertEqual(dom.root.some_int2._pfp__path(), "root.some_int2")
+        # self.assertEqual(dom.root.nested1._pfp__path(), "root.nested1")
+        # self.assertEqual(dom.root.nested1.some_int._pfp__path(), "root.nested1.some_int")
+        # self.assertEqual(dom.root.nested1.nested2._pfp__path(), "root.nested1.nested2")
+        # self.assertEqual(dom.root.nested1.nested2.inner._pfp__path(), "root.nested1.nested2.inner")
+        # self.assertEqual(dom.root.nested1.nested2.array._pfp__path(), "root.nested1.nested2.array")
+        # self.assertEqual(dom.root.nested1.nested2.array[0]._pfp__path(), "root.nested1.nested2.array[0]")
+        # self.assertEqual(dom.root.nested1.nested2.array[1]._pfp__path(), "root.nested1.nested2.array[1]")
+        # self.assertEqual(dom.root.nested1.nested2.array[2]._pfp__path(), "root.nested1.nested2.array[2]")
+        # self.assertEqual(dom.root.nested1.nested2.array[3]._pfp__path(), "root.nested1.nested2.array[3]")
 
     def test_struct(self):
         dom = self._test_parse_build(
@@ -188,8 +197,8 @@ class TestStructUnion(utils.PfpTestCase):
                 blah test(2, 3);
             """,
         )
-        self.assertEqual(dom.test.chars1, "aa")
-        self.assertEqual(dom.test.chars2, "bbb")
+        self.assertEqual(dom.test.chars1, b"aa")
+        self.assertEqual(dom.test.chars2, b"bbb")
 
     def test_struct_with_parameters2(self):
         # ``descr_length l(bytes)`` is being treated as a function
@@ -338,7 +347,7 @@ class TestStructUnion(utils.PfpTestCase):
                 } test;
             """,
         )
-        self.assertEqual(dom.test.onion.raw, "abcd")
+        self.assertEqual(dom.test.onion.raw, b"abcd")
         self.assertEqual(dom.test.onion.chars.a, ord("a"))
         self.assertEqual(dom.test.onion.chars.b, ord("b"))
         self.assertEqual(dom.test.onion.chars.c, ord("c"))
@@ -357,9 +366,10 @@ class TestStructUnion(utils.PfpTestCase):
                     } union_test;
                     char d;
                 } test;
+                local int off = startof(test.union_test);
             """,
         )
-        self.assertEqual(dom.test.union_test._pfp__offset, 2)
+        self.assertEqual(dom.off, 2)
 
     def test_union_offset2(self):
         dom = self._test_parse_build(
@@ -376,9 +386,10 @@ class TestStructUnion(utils.PfpTestCase):
                     CHAR_UNION union_test;
                     char d;
                 } test;
+                local int off = startof(test.union_test);
             """,
         )
-        self.assertEqual(dom.test.union_test._pfp__offset, 2)
+        self.assertEqual(dom.off, 2)
 
     def test_auto_increment_field_names(self):
         # when a field is declared multiple times with the same name, but
@@ -395,11 +406,11 @@ class TestStructUnion(utils.PfpTestCase):
             """,
         )
 
-        self.assertEqual(dom.header_0, ord("a"))
-        self.assertEqual(dom.val_0, 1)
+        self.assertEqual(dom.header[0], ord("a"))
+        self.assertEqual(dom.val[0], 1)
 
-        self.assertEqual(dom.header_1, ord("0"))
-        self.assertEqual(dom.val_1, 2)
+        self.assertEqual(dom.header[1], ord("0"))
+        self.assertEqual(dom.val[1], 2)
 
     def test_auto_increment_but_still_reference_last_decl_normal(self):
         # this is an interesting behavior of 010 scripts. When a field
@@ -457,10 +468,14 @@ class TestStructUnion(utils.PfpTestCase):
                 three_bytes bytes;
             """,
         )
-        chars = [x for x in dom.bytes]
-        self.assertEquals(chars[0], 0x41)
-        self.assertEquals(chars[1], 0x42)
-        self.assertEquals(chars[2], 0x43)
+        chars = [
+            dom.bytes.first,
+            dom.bytes.second,
+            dom.bytes.third,
+        ]
+        self.assertEqual(chars[0], 0x41)
+        self.assertEqual(chars[1], 0x42)
+        self.assertEqual(chars[2], 0x43)
 
 
 if __name__ == "__main__":

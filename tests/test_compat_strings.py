@@ -9,7 +9,6 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pfp
-import pfp.fields
 import pfp.interp
 import pfp.utils
 
@@ -18,7 +17,7 @@ import utils
 
 class TestCompatStrings(utils.PfpTestCase):
     def setUp(self):
-        pfp.fields.NumberBase.endian = pfp.fields.BIG_ENDIAN
+        pfp.interp.Endian.current = pfp.interp.Endian.BIG
 
     def tearDown(self):
         pass
